@@ -1,12 +1,9 @@
 DECLARE
     a b t(100)
 IN
-	GET a;
-	PUT b;
 	IF a > 5 THEN
 		a := 2 + 4;
 	ELSE
-		a := c / 3;
+		b := 2;
 	ENDIF
-
 END
