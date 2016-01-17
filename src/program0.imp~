@@ -1,0 +1,11 @@
+DECLARE
+    a b t(100)
+IN
+	GET a;
+	IF a > 5 THEN
+		a := 5;
+	ELSE
+		a := 2;
+	ENDIF
+
+END
