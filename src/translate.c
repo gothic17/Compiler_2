@@ -468,17 +468,15 @@ void translate(node *p) {
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
-
 		// Utwórz etykietę L1 z powyzszego przykładu
 		char *new_label = generate_new_label();
+		p->string = symbol_name;
 
 		add_four("IFZ", p->children[0]->string, "GOTO", new_label, symbol_name);
 
 		translate(p->children[1]);
 
 		add_four("", "", "", "", new_label);
-
-		p->string = symbol_name;
 	}
 
 	else if (strcmp(p->string, "IF_ELSE") == 0) {
@@ -490,13 +488,11 @@ void translate(node *p) {
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
-
 		// Utwórz etykietę L1 z powyzszego przykładu
 		char *new_label_1 = generate_new_label();
+		p->string = symbol_name_1;
 
 		add_four("IFZ", p->children[0]->string, "GOTO", new_label_1, symbol_name_1);
-
-		p->string = symbol_name_1;
 
 		// Komendy dla prawdziwego IF
 		translate(p->children[1]);
@@ -506,9 +502,7 @@ void translate(node *p) {
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
-
 		char *new_label_2 = generate_new_label();
-
 		p->string = symbol_name_2;
 
 		add_four("GOTO", new_label_2, "", "", symbol_name_2);
@@ -520,6 +514,149 @@ void translate(node *p) {
 		translate(p->children[2]);
 
 		add_four("", "", "", "", new_label_2);
+	}
+
+	else if (strcmp(p->string, "WHILE") == 0) {
+		char *new_label_1 = generate_new_label();
+
+		add_four("", "", "", "", new_label_1);
+
+		translate(p->children[0]);
+
+		// Utwórz nowy symbol (t2) z przykładu "IFZ t1 GOTO L1 t2"
+		char *symbol_name_1 = generate_new_address();
+		symbol *new_symbol = create_symbol(symbol_name_1, "-", address_counter, 1,
+				p->first_line, p->first_column, p->last_line, p->last_column);
+		address_counter++;
+		add_symbol(new_symbol);
+		// Utwórz etykietę L1 z powyzszego przykładu
+		char *new_label_2 = generate_new_label();
+		p->string = symbol_name_1;
+
+		add_four("IFZ", p->children[0]->string, "GOTO", new_label_2, symbol_name_1);
+
+		translate(p->children[1]);
+
+		char *symbol_name_2 = generate_new_address();
+		new_symbol = create_symbol(symbol_name_1, "-", address_counter, 1,
+				p->first_line, p->first_column, p->last_line, p->last_column);
+		address_counter++;
+		add_symbol(new_symbol);
+		p->string = symbol_name_2;
+
+		add_four("GOTO", new_label_1, "", "", symbol_name_2);
+
+		add_four("", "", "", "", new_label_2);
+	}
+
+	else if (strcmp(p->string, "FOR") == 0) {
+		// Utworzenie nowej podlisty, w której zadeklarujemy iterator petli FOR
+		add_symbols_sublist();
+		// Dodanie iteratora do nowej podlisty
+		symbol *new_symbol = create_symbol(p->children[0]->string, "-", address_counter, 1,
+				p->first_line, p->first_column, p->last_line, p->last_column);
+		address_counter++;
+		add_symbol(new_symbol);
+
+		// Dodanie wiersza przypisania wartości do iteratora dla pętli FOR np. ":= i - 0 i"
+		add_four(":=", p->children[0]->string, "", p->children[1]->string, p->children[0]->string);
+
+		// Utworzenie nowej etykiety
+		char *new_label_1 = generate_new_label();
+		add_four("", "", "", "", new_label_1);
+
+		// Utworzenie warunku dla iteratora pętli FOR np. "< i - 10 t0"
+		char *symbol_name_1 = generate_new_address();
+		new_symbol = create_symbol(symbol_name_1, "-", address_counter, 1,
+				p->first_line, p->first_column, p->last_line, p->last_column);
+		address_counter++;
+		add_symbol(new_symbol);
+		p->string = symbol_name_1;
+
+		add_four("<", p->children[0]->string, "", p->children[2]->string, symbol_name_1);
+
+
+		char *symbol_name_2 = generate_new_address();
+		new_symbol = create_symbol(symbol_name_2, "-", address_counter, 1,
+				p->first_line, p->first_column, p->last_line, p->last_column);
+		address_counter++;
+		add_symbol(new_symbol);
+		p->string = symbol_name_2;
+		char *new_label_2 = generate_new_label();
+		p->string = symbol_name_2;
+
+		add_four("IFZ", p->children[0]->string, "GOTO", new_label_2, symbol_name_2);
+
+		translate(p->children[3]);
+
+		add_four("++", p->children[0]->string, "", "", p->children[0]->string);
+
+		char *symbol_name_3 = generate_new_address();
+		new_symbol = create_symbol(symbol_name_3, "-", address_counter, 1,
+				p->first_line, p->first_column, p->last_line, p->last_column);
+		address_counter++;
+		add_symbol(new_symbol);
+		p->string = symbol_name_3;
+
+		add_four("GOTO", new_label_1, "", "", symbol_name_3);
+
+		add_four("", "", "", "", new_label_2);
+		// Usunięcie ostatniej podlisty [Do ZROBIENIA]
+	}
+
+	else if (strcmp(p->string, "FOR_DOWN") == 0) {
+		// Utworzenie nowej podlisty, w której zadeklarujemy iterator petli FOR
+		add_symbols_sublist();
+		// Dodanie iteratora do nowej podlisty
+		symbol *new_symbol = create_symbol(p->children[0]->string, "-", address_counter, 1,
+				p->first_line, p->first_column, p->last_line, p->last_column);
+		address_counter++;
+		add_symbol(new_symbol);
+
+		// Dodanie wiersza przypisania wartości do iteratora dla pętli FOR np. ":= i - 0 i"
+		add_four(":=", p->children[0]->string, "", p->children[1]->string, p->children[0]->string);
+
+		// Utworzenie nowej etykiety
+		char *new_label_1 = generate_new_label();
+		add_four("", "", "", "", new_label_1);
+
+		// Utworzenie warunku dla iteratora pętli FOR np. "< i - 10 t0"
+		char *symbol_name_1 = generate_new_address();
+		new_symbol = create_symbol(symbol_name_1, "-", address_counter, 1,
+				p->first_line, p->first_column, p->last_line, p->last_column);
+		address_counter++;
+		add_symbol(new_symbol);
+		p->string = symbol_name_1;
+
+		add_four(">", p->children[0]->string, "", p->children[2]->string, symbol_name_1);
+
+
+		char *symbol_name_2 = generate_new_address();
+		new_symbol = create_symbol(symbol_name_2, "-", address_counter, 1,
+				p->first_line, p->first_column, p->last_line, p->last_column);
+		address_counter++;
+		add_symbol(new_symbol);
+		p->string = symbol_name_2;
+		char *new_label_2 = generate_new_label();
+		p->string = symbol_name_2;
+
+		add_four("IFZ", p->children[0]->string, "GOTO", new_label_2, symbol_name_2);
+
+		translate(p->children[3]);
+
+		add_four("--", p->children[0]->string, "", "", p->children[0]->string);
+
+		char *symbol_name_3 = generate_new_address();
+		new_symbol = create_symbol(symbol_name_3, "-", address_counter, 1,
+				p->first_line, p->first_column, p->last_line, p->last_column);
+		address_counter++;
+		add_symbol(new_symbol);
+		p->string = symbol_name_3;
+
+		add_four("GOTO", new_label_1, "", "", symbol_name_3);
+
+		add_four("", "", "", "", new_label_2);
+		// Usunięcie ostatniej podlisty [Do ZROBIENIA]
 	}
 
 	else {

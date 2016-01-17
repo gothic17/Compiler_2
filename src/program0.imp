@@ -1,9 +1,7 @@
 DECLARE
-    a b t(100)
+    a c b t(100)
 IN
-	IF a > 5 THEN
-		a := 2 + 4;
-	ELSE
-		b := 2;
-	ENDIF
+	FOR i DOWN FROM 10 TO 0 DO
+		a := 10;
+	ENDFOR
 END
