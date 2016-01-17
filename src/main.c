@@ -11,7 +11,7 @@
 extern FILE *yyin;
 
 /* Funkcje */
-int yyparse(errors_list *errors_list_root);
+int yyparse(error *errors_list_root);
 
 /********** DRZEWO AST **********/
 
@@ -83,27 +83,38 @@ error *create_error(char *string, int first_line, int first_column, int last_lin
 	new->last_line = last_line;
 	new->last_column = last_column;
 
+	new->next = NULL;
+
 	return new;
 }
 
 /* add_error wstawia element x do listy błędów za elementem, na który wskazuje wskaźnik current*/
-void add_error(errors_list *current, error *x) {
-	errors_list *new = malloc(sizeof(errors_list));
-	new->data = x;
-	new->next = current->next;
-	current->next = new;
-}
+void add_error(error *new_error) {
+	if(errors_list_root == NULL) {
+		errors_list_root = malloc(sizeof(error));
+		errors_list_root = new_error;
+		errors_list_root->next = NULL;
+	}
+	else {
+		error *current = errors_list_root;
+		while(current->next != NULL) {
+			current = current->next;
+		}
 
+		new_error->next = current->next;
+		current->next = new_error;
+	}
+}
 /* remove_error - usuwa z listy błędów (zaczynającej się od korzenia root) błąd x */
-void remove_error(errors_list *root, error *x) {
-   errors_list *temp;
-   errors_list *previous;
-   temp = root;
-   while(temp != NULL && temp->data != x) {
+void remove_error(error *x) {
+   error *temp;
+   error *previous;
+   temp = errors_list_root;
+   while(temp != NULL && temp != x) {
 	   previous = temp;
-      temp = temp->next;
+	   temp = temp->next;
    }
-   if(temp == root) root = root->next;
+   if(temp == errors_list_root) errors_list_root = errors_list_root->next;
    else {
 	   previous->next = temp->next;
    }
@@ -112,19 +123,21 @@ void remove_error(errors_list *root, error *x) {
 
 /* find_error szuka elementu x w liście błędów, zwraca jego adres albo null, gdy lista nie zawiera
  * elementu x.*/
-errors_list *find_error(errors_list *root, error *x) {
-   while (root != NULL && root->data != x) {
-	   root = root->next;
-   }
-   return root;
+error *find_error(error *x) {
+	error *temp = errors_list_root;
+	while (temp != NULL && temp != x) {
+		temp = temp->next;
+	}
+	return temp;
 }
 
-void print_errors(errors_list *root) {
-	while(root != NULL) {
-		if (strcmp(root->data->string, "ROOT_ERROR") != 0) {
-			printf("Error: %d.%d - %d.%d - %s\n", root->data->first_line, root->data->first_column, root->data->last_line, root->data->last_column, root->data->string);
+void print_errors() {
+	error *temp = errors_list_root;
+	while(temp != NULL) {
+		if (strcmp(temp->string, "ROOT_ERROR") != 0) {
+			printf("Error: %d.%d - %d.%d - %s\n", temp->first_line, temp->first_column, temp->last_line, temp->last_column, temp->string);
 		}
-		root = root->next;
+		temp = temp->next;
 	}
 }
 
@@ -173,12 +186,18 @@ void add_symbols_sublist() {
 
 	symbols_list *temp = symbols_list_root;
 
-	while (temp->next != NULL) {
-		temp = temp->next;
+	if(symbols_list_root == NULL) {
+		symbols_list_root = malloc(sizeof(symbols_list));
+		symbols_list_root->next = NULL;
+		symbols_list_root->data = new_symbol;
 	}
-
-	new_list->next = temp->next;
-	temp->next = new_list;
+	else {
+		while (temp->next != NULL) {
+			temp = temp->next;
+		}
+		new_list->next = temp->next;
+		temp->next = new_list;
+	}
 
 	//sublists_pointer++;
 }
@@ -201,19 +220,35 @@ void remove_symbols_sublist(symbols_list *x) {
 
 
 /* search_for_symbol - zwraca 1, jesli symbol został znaleziony i 0 w p.p. */
-int search_for_symbol(symbol *symbol) {
+int search_for_symbol(char *symbol_name) {
 	symbols_list *temp = symbols_list_root;
 
 	while (temp != NULL) {
 		struct symbol *temp_symbol = temp->data;
 		while(temp_symbol != NULL) {
-			if (temp_symbol == symbol) return 1;
+			if (strcmp(temp_symbol->string, symbol_name) == 0) return 1;
 			temp_symbol = temp_symbol->next;
 		}
 		temp = temp->next;
 	}
 
 	return 0;
+}
+
+void print_symbols() {
+	symbols_list *symbols_sublist = symbols_list_root;
+
+	while(symbols_sublist != NULL) {
+		symbol *temp_symbol = symbols_sublist->data;
+		while(temp_symbol != NULL) {
+			if(strcmp(temp_symbol->string, "ROOT_SYMBOL") != 0) {
+				printf("%*s %*d %*d\n", 5, temp_symbol->string, 5, temp_symbol->address,
+						5, temp_symbol->size);
+			}
+			temp_symbol = temp_symbol->next;
+		}
+		symbols_sublist = symbols_sublist->next;
+	}
 }
 
 /********* KOD TRÓJADRESOWY ***************/
@@ -254,37 +289,27 @@ void print_fours() {
 void main(int argc, char **argv) {
 
 	/******** Korzeń listy błędów **********/
-	error *error0 = create_error("ROOT_ERROR", 0, 0, 0, 0);
+	errors_list_root = NULL;
+	/*error *error0 = create_error("ROOT_ERROR", 0, 0, 0, 0);
 	errors_list_root = malloc(sizeof(errors_list));
 	errors_list_root->next = NULL;
-	errors_list_root->data = error0;
+	errors_list_root->data = error0;*/
 
-	/**************************************/
 
 	/******* Korzen listy symboli *********/
-	symbol *symbol0 = create_symbol("ROOT_SYMBOL", "-", 0, 0,0,0,0,0);
-	symbols_list_root = malloc(sizeof(symbols_list));
-	symbols_list_root->next = NULL;
-	symbols_list_root->data = symbol0;
+	symbols_list_root = NULL;
 
-	symbol *symbol1 = create_symbol("!!!SYMBOL!!!!", "-", 0, 0,0,0,0,0);
-	add_symbols_sublist();
-	add_symbol(symbol1);
-
-	/**************************************/
 
 	/****** Korzeń drzewa AST *************/
 	AST_root = malloc(sizeof(node));
 	AST_root = NULL;
 
-	/**************************************/
 
 	/***** Korzeń listy czwórek ***********/
 	fours_root = malloc(sizeof(four));
 	fours_root->operator1 = "ROOT_FOUR";
 	fours_root->next = NULL;
 
-	/*************************************/
 
 	/***** Czytanie z pliku i parser******/
 	char temp[4] = {argv[1][strlen(argv[1])-4], argv[1][strlen(argv[1])-3], argv[1][strlen(argv[1])-2], argv[1][strlen(argv[1])-1]};
@@ -307,18 +332,22 @@ void main(int argc, char **argv) {
 	} while(!feof(yyin));
 
 	fclose(file);
-	/************************************/
 
 	/******* Zmienne do translacji ******/
 	new_address_counter = 0;
 	new_label_counter = 0;
+	address_counter = 0;
 	/***********************************/
-
-	print_errors(errors_list_root);
 
 	translate(AST_root);
 
+	printf("-----Tablica symboli-------\n");
+	print_symbols();
+
 	printf("-----Kod trójadresowy------\n");
 	print_fours();
+
+	printf("---------Błędy-------------\n");
+	print_errors();
 
 }

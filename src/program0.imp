@@ -4,9 +4,9 @@ IN
 	GET a;
 	PUT b;
 	IF a > 5 THEN
-		a := 5;
+		a := 2 + 4;
 	ELSE
-		a := 2;
+		a := c / 3;
 	ENDIF
 
 END

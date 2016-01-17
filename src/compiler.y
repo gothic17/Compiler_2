@@ -20,12 +20,12 @@ extern int yylex();
 extern int yyparse();
 extern FILE* yyin;
 
-void yyerror(errors_list *errors_list_root, char *s, ...);
-void lyyerror(YYLTYPE t, errors_list *errors_list_root, int n, char *s, ...);
+void yyerror(error *errors_list_root, char *s, ...);
+void lyyerror(YYLTYPE t, error *errors_list_root, int n, char *s, ...);
 
 %}
 
-%parse-param {errors_list *errors_list_root}
+%parse-param {error *errors_list_root}
 
 
 %union {
@@ -155,7 +155,7 @@ identifier:
 %%
 
 
-void yyerror(errors_list *errors_list_root, char *s, ...) {
+void yyerror(error *errors_list_root, char *s, ...) {
   va_list ap;
   va_start(ap, s);
 
@@ -167,7 +167,7 @@ void yyerror(errors_list *errors_list_root, char *s, ...) {
 }
 
 /* n - liczba char* do przekazania. */
-void lyyerror(YYLTYPE t, errors_list *errors_list_root, int n, char *s, ...) {
+void lyyerror(YYLTYPE t, error *errors_list_root, int n, char *s, ...) {
   va_list ap;
   va_start(ap, s);
   int buffer = n;
@@ -189,6 +189,6 @@ void lyyerror(YYLTYPE t, errors_list *errors_list_root, int n, char *s, ...) {
   }
   
   while (errors_list_root->next != NULL) errors_list_root = errors_list_root->next;
-  add_error(errors_list_root, create_error(temp, t.first_line, t.first_column, t.last_line, t.last_column));
+  add_error(create_error(temp, t.first_line, t.first_column, t.last_line, t.last_column));
 
 }

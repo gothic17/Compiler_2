@@ -4,6 +4,9 @@
 /****** POMOCNICZE ZMIENNE ********/
 int new_address_counter; // Pozwala na tworzenie nowych adresów to tablicy symboli (np. t1, t2...)
 int new_label_counter; // Pozwala na tworzenie nowych etykiet do kodu trójadresowego (np. L0 ...)
+int address_counter; // Pozwala na przypisywanie miejsca w pamięci nowo utworzonym zmiennym
+
+
 
 /****** DRZEWO AST ****************/
 
@@ -23,6 +26,8 @@ typedef struct node {
 // Korzen drzewa AST
 static node *AST_root;
 
+
+
 /******* LISTA BŁĘDÓW *******/
 
 // Struktura błędu
@@ -32,16 +37,13 @@ typedef struct error {
 	int last_line;
 	int first_column;
 	int last_column;
+
+	struct error *next;
 } error;
 
-typedef struct errors_list_element{
-   error *data;
-   struct errors_list_element *next;
-
-} errors_list;
-
 /******* Korzen listy błędów *******/
-static errors_list *errors_list_root;
+static error *errors_list_root;
+
 
 
 /****** LISTA SYMBOLI *************/
@@ -75,8 +77,9 @@ typedef struct symbols_list_element {
 static symbols_list *symbols_list_root;
 
 
-/************* CZWÓRKI ***************/
 
+
+/************* CZWÓRKI ***************/
 
 /*	Struktura jednej czwórki, która zostanie użyta w tablicy czwórek.
  * 	operator - operator w działaniu,
@@ -96,23 +99,8 @@ typedef struct four {
 static four *fours_root;
 
 
-node *add_node(int number_of_children, char *string, node *children[]);
 
-void add_child(char *operation, node *parent, node *child);
-
-void free_node(node *p);
-
-void post_order(node *p);
-
-error *create_error(char *string, int first_line, int first_column, int last_line, int last_column);
-
-void add_error(errors_list *current, error *x);
-
-void remove_error(errors_list *root, error *x);
-
-errors_list *find_error(errors_list *root, error *x);
-
-void add_four(char *operator1, char *arg1, char *operator2, char *arg2, char *result);
+/************* ASSEMBLER **************/
 
 typedef struct assembler_instruction {
 	int row;
@@ -121,5 +109,33 @@ typedef struct assembler_instruction {
 	char arg2[3];
 
 } assembler_instruction;
+
+
+/************ FUNKCJE *****************/
+// Drzewo AST
+node *add_node(int number_of_children, char *string, node *children[]);
+void add_child(char *operation, node *parent, node *child);
+void free_node(node *p);
+void post_order(node *p);
+
+// Błędy
+error *create_error(char *string, int first_line, int first_column, int last_line, int last_column);
+void add_error(error *x);
+void remove_error(error *x);
+error *find_error(error *x);
+void print_errors();
+
+// Lista symboli
+symbol *create_symbol(char *string, char *type, int address, int size, int first_line,
+		int first_column, int last_line, int last_column);
+void add_symbol(symbol *symbol);
+void add_symbols_sublist();
+void remove_symbols_sublist(symbols_list *x);
+int search_for_symbol(char *symbol_name);
+void print_symbols();
+
+// Kod trójadresowy
+void add_four(char *operator1, char *arg1, char *operator2, char *arg2, char *result);
+void print_fours();
 
 #endif
