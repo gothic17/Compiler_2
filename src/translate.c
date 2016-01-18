@@ -64,6 +64,17 @@ void interpret(node *p) {
 				add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 						p->children[0]->last_line, p->children[0]->last_column));
 			}
+			// Sprawdzenie, czy nie bedziemy modyfikować iteratora petli
+			symbol *found_symbol = find_symbol(p->children[0]->string);
+			if(found_symbol != NULL && strcmp(found_symbol->type, "ITERATOR") == 0) {
+				char *string = calloc(strlen("Próba zmiany iteratora '") + strlen(p->children[0]->string +
+						strlen("' wewnątrz petli")), sizeof(char));
+				strcat(string, "Próba zmiany iteratora '");
+				strcat(string, p->children[0]->string);
+				strcat(string, "' wewnątrz petli");
+				add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+						p->children[0]->last_line, p->children[0]->last_column));
+			}
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
 			if(search_for_symbol(p->children[1]->string) == 0) {
@@ -438,23 +449,33 @@ void translate(node *p) {
 	if(strcmp(p->string, "VDEC") == 0) {
 		add_symbols_sublist();
 		while (i < p->number_of_children) {
-			if(strcmp(p->children[i]->string, "VDEC_TABLE") == 0) {
-				symbol *new_symbol = create_symbol(p->children[i]->children[0]->string, "TABLE",
-						address_counter, atoi(p->children[i]->children[1]->string),
-						p->children[i]->first_line, p->children[i]->first_column,
-						p->children[i]->last_line, p->children[i]->last_column);
-				address_counter+= atoi(p->children[i]->children[1]->string);
-				add_symbol(new_symbol);
-				i++;
+			if(check_if_symbol_already_declared(p->children[i]->string) == 1) {
+				char *string = calloc(strlen("Zmienna '") + strlen(p->children[i]->string) +
+						strlen("' została już wczesniej zadeklarowana."), sizeof(char));
+				strcat(string, "Zmienna '");
+				strcat(string, p->children[i]->string);
+				strcat(string, "' została już wczesniej zadeklarowana.");
+				add_error(create_error(string, p->children[i]->first_line, p->children[i]->first_column,
+						p->children[i]->last_line, p->children[i]->last_column));
 			}
 			else {
-				symbol *new_symbol = create_symbol(p->children[i]->string, "ID", address_counter, 1,
-						p->children[i]->first_line, p->children[i]->first_column,
-						p->children[i]->last_line, p->children[i]->last_column);
-				address_counter++;
-				add_symbol(new_symbol);
-				i++;
+				if(strcmp(p->children[i]->string, "VDEC_TABLE") == 0) {
+					symbol *new_symbol = create_symbol(p->children[i]->children[0]->string, "TABLE",
+							address_counter, atoi(p->children[i]->children[1]->string),
+							p->children[i]->first_line, p->children[i]->first_column,
+							p->children[i]->last_line, p->children[i]->last_column);
+					address_counter+= atoi(p->children[i]->children[1]->string);
+					add_symbol(new_symbol);
+				}
+				else {
+					symbol *new_symbol = create_symbol(p->children[i]->string, "ID", address_counter, 1,
+							p->children[i]->first_line, p->children[i]->first_column,
+							p->children[i]->last_line, p->children[i]->last_column);
+					address_counter++;
+					add_symbol(new_symbol);
+				}
 			}
+			i++;
 		}
 	}
 
@@ -553,7 +574,7 @@ void translate(node *p) {
 		// Utworzenie nowej podlisty, w której zadeklarujemy iterator petli FOR
 		add_symbols_sublist();
 		// Dodanie iteratora do nowej podlisty
-		symbol *new_symbol = create_symbol(p->children[0]->string, "-", address_counter, 1,
+		symbol *new_symbol = create_symbol(p->children[0]->string, "ITERATOR", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
@@ -587,6 +608,7 @@ void translate(node *p) {
 
 		add_four("IFZ", p->children[0]->string, "GOTO", new_label_2, symbol_name_2);
 
+		// Zapamietaj iterator. Jesli poniżej zostalo zmienione, wyrzuć błąd [DO ZROBIENIA]
 		translate(p->children[3]);
 
 		add_four("++", p->children[0]->string, "", "", p->children[0]->string);
@@ -601,14 +623,15 @@ void translate(node *p) {
 		add_four("GOTO", new_label_1, "", "", symbol_name_3);
 
 		add_four("", "", "", "", new_label_2);
-		// Usunięcie ostatniej podlisty [Do ZROBIENIA]
+		// Usunięcie ostatniej podlisty
+		remove_symbols_sublist();
 	}
 
 	else if (strcmp(p->string, "FOR_DOWN") == 0) {
 		// Utworzenie nowej podlisty, w której zadeklarujemy iterator petli FOR
 		add_symbols_sublist();
 		// Dodanie iteratora do nowej podlisty
-		symbol *new_symbol = create_symbol(p->children[0]->string, "-", address_counter, 1,
+		symbol *new_symbol = create_symbol(p->children[0]->string, "ITERATOR", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
@@ -642,6 +665,7 @@ void translate(node *p) {
 
 		add_four("IFZ", p->children[0]->string, "GOTO", new_label_2, symbol_name_2);
 
+		// Zapamietaj iterator. Jesli poniżej zostalo zmienione, wyrzuć błąd [DO ZROBIENIA]
 		translate(p->children[3]);
 
 		add_four("--", p->children[0]->string, "", "", p->children[0]->string);
@@ -656,7 +680,8 @@ void translate(node *p) {
 		add_four("GOTO", new_label_1, "", "", symbol_name_3);
 
 		add_four("", "", "", "", new_label_2);
-		// Usunięcie ostatniej podlisty [Do ZROBIENIA]
+		// Usunięcie ostatniej podlisty
+		remove_symbols_sublist();
 	}
 
 	else {

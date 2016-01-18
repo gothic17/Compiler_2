@@ -6,7 +6,7 @@ int new_address_counter; // Pozwala na tworzenie nowych adresów to tablicy symb
 int new_label_counter; // Pozwala na tworzenie nowych etykiet do kodu trójadresowego (np. L0 ...)
 int address_counter; // Pozwala na przypisywanie miejsca w pamięci nowo utworzonym zmiennym
 
-
+int number_of_programs; // Pozwala na rozpoznanie, ile jest zagnieżdżonych programow
 
 /****** DRZEWO AST ****************/
 
@@ -25,7 +25,6 @@ typedef struct node {
 
 // Korzen drzewa AST
 static node *AST_root;
-
 
 
 /******* LISTA BŁĘDÓW *******/
@@ -130,8 +129,10 @@ symbol *create_symbol(char *string, char *type, int address, int size, int first
 		int first_column, int last_line, int last_column);
 void add_symbol(symbol *symbol);
 void add_symbols_sublist();
-void remove_symbols_sublist(symbols_list *x);
+void remove_symbols_sublist();
 int search_for_symbol(char *symbol_name);
+int check_if_symbol_already_declared(char *symbol_name);
+symbol *find_symbol(char *symbol_name);
 void print_symbols();
 
 // Kod trójadresowy

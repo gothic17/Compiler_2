@@ -33,9 +33,10 @@ node *add_node(int number_of_children, char *string, node *children[]) {
 	return p;
 }
 
-void add_child(char *operation, node *parent, node *child) {
+void add_child(char *operation, node *parent, node *child) { //[DO POPRAWY]
 		/* Dodane ze wzgledu na przesunięcia, jakie pojawiały się przy dodawaniu wielu linii kodu
 		 * (np. COMMANDS zamieniało się w krzaki.*/
+
 		parent->string = operation;
 
 		if ((parent->children[parent->number_of_children] = malloc(sizeof(child))) == NULL) yyerror("Brak pamięci");
@@ -43,6 +44,7 @@ void add_child(char *operation, node *parent, node *child) {
 		parent->children[parent->number_of_children] = child;
 
 		parent->number_of_children++;
+
 }
 
 void free_node(node *p) {
@@ -203,17 +205,17 @@ void add_symbols_sublist() {
 }
 
 /* remove_error - usuwa z listy błędów (zaczynającej się od korzenia root) błąd x */
-void remove_symbols_sublist(symbols_list *x) {
+void remove_symbols_sublist() {
 	symbols_list *temp;
 	symbols_list *previous;
 	temp = symbols_list_root;
-	while(temp != NULL && temp != x) {
+	while(temp->next != NULL) {
 		previous = temp;
 		temp = temp->next;
 	}
-	if(temp == symbols_list_root) symbols_list_root = symbols_list_root->next;
+	if(temp == symbols_list_root) symbols_list_root = NULL;
 	else {
-		previous->next = temp->next;
+		previous->next = NULL;
 	}
 	if (temp != NULL) free(temp);
 }
@@ -235,6 +237,38 @@ int search_for_symbol(char *symbol_name) {
 	return 0;
 }
 
+/* Zwraca 0, jesli symbol nie zostal zadeklarowany w ostatniej podliście (mógł byc zadeklarowany
+	we wczesniejszej podliscie, ale wtedy wystepuje przesłanianie). Zwraca 1, jesli został
+	znaleziony */
+int check_if_symbol_already_declared(char *symbol_name) {
+	symbols_list *temp = symbols_list_root;
+	//Przejdź do ostatniej podlisty
+	while(temp->next != NULL) temp = temp->next;
+
+	symbol *temp_symbol = temp->data;
+	while(temp_symbol != NULL) {
+		if (strcmp(temp_symbol->string, symbol_name) == 0) return 1;
+		temp_symbol = temp_symbol->next;
+	}
+
+	return 0;
+}
+
+// Zwraca znaleziony symbol, lub NULL, jesli nie znalazł symbolu.
+symbol *find_symbol(char *symbol_name) {
+	symbols_list *temp = symbols_list_root;
+	//Przejdź do ostatniej podlisty
+	while(temp->next != NULL) temp = temp->next;
+
+	symbol *temp_symbol = temp->data;
+	while(temp_symbol != NULL) {
+		if (strcmp(temp_symbol->string, symbol_name) == 0) return temp_symbol;
+		temp_symbol = temp_symbol->next;
+	}
+
+	return NULL;
+}
+
 void print_symbols() {
 	symbols_list *symbols_sublist = symbols_list_root;
 
@@ -242,7 +276,8 @@ void print_symbols() {
 		symbol *temp_symbol = symbols_sublist->data;
 		while(temp_symbol != NULL) {
 			if(strcmp(temp_symbol->string, "ROOT_SYMBOL") != 0) {
-				printf("%*s %*d %*d\n", 5, temp_symbol->string, 5, temp_symbol->address,
+				printf("%*s %*s %*d %*d\n", 5, temp_symbol->string, 7, temp_symbol->type,
+						5, temp_symbol->address,
 						5, temp_symbol->size);
 			}
 			temp_symbol = temp_symbol->next;
@@ -290,20 +325,13 @@ void main(int argc, char **argv) {
 
 	/******** Korzeń listy błędów **********/
 	errors_list_root = NULL;
-	/*error *error0 = create_error("ROOT_ERROR", 0, 0, 0, 0);
-	errors_list_root = malloc(sizeof(errors_list));
-	errors_list_root->next = NULL;
-	errors_list_root->data = error0;*/
-
 
 	/******* Korzen listy symboli *********/
 	symbols_list_root = NULL;
 
-
 	/****** Korzeń drzewa AST *************/
 	AST_root = malloc(sizeof(node));
 	AST_root = NULL;
-
 
 	/***** Korzeń listy czwórek ***********/
 	fours_root = malloc(sizeof(four));
@@ -337,6 +365,8 @@ void main(int argc, char **argv) {
 	new_address_counter = 0;
 	new_label_counter = 0;
 	address_counter = 0;
+
+	number_of_programs = -1;
 	/***********************************/
 
 	translate(AST_root);

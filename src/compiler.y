@@ -40,33 +40,35 @@ void lyyerror(YYLTYPE t, error *errors_list_root, int n, char *s, ...);
 
 %type <node_pointer> program vdeclarations
 %type <node_pointer> commands command expression condition
-%type <node_pointer> num value identifier pidentifier
+%type <node_pointer> value identifier /* num pidentifier*/
 
-%token '\n' QUIT '(' ')'
+%token <node_pointer> '\n' QUIT '(' ')'
 
-%token DECLARE IN END
+%token <node_pointer> DECLARE IN END
 
-%token ';'
-%token IF THEN ELSE ENDIF
-%token WHILE DO ENDWHILE
-%token FOR DOWN FROM TO ENDFOR
-%token GET PUT
+%token <node_pointer> ';'
+%token <node_pointer> IF THEN ELSE ENDIF
+%token <node_pointer> WHILE DO ENDWHILE
+%token <node_pointer> FOR DOWN FROM TO ENDFOR
+%token <node_pointer> GET PUT
 
-%token num pidentifier
+%token <node_pointer> num pidentifier
 
-%left '+' '-'
-%left '*' '/' '%'
+%left <node_pointer> '+' '-'
+%left <node_pointer> '*' '/' '%'
 
-%left '=' '<' '>'
-%left ASSIGN DIFFERENT SMALLEREQUAL BIGGEREQUAL
+%left <node_pointer> '=' '<' '>'
+%left <node_pointer> ASSIGN DIFFERENT SMALLEREQUAL BIGGEREQUAL
 
-%nonassoc IF_ELSE
-%nonassoc FOR_DOWN
+%nonassoc <node_pointer> IF_ELSE
+%nonassoc <node_pointer> FOR_DOWN
+
 
 %% /**********The grammar follows. ****************/ 
 
 program:
-	DECLARE vdeclarations IN commands END { struct node *children[2] = {$2, $4};
+	DECLARE vdeclarations IN commands END { number_of_programs++;
+											struct node *children[3] = {$2, $4, $5};
 											$$ = add_node(2, "DECLARE", children);
 										    post_order($$); 
 										    //free_node($$); 
@@ -75,7 +77,8 @@ program:
 ;
 
 vdeclarations:
-	vdeclarations pidentifier			{ add_child("VDEC", $1, $2); }
+	vdeclarations pidentifier			{ struct node *children[0];
+										  add_child("VDEC", $1, add_node(0, $2->string, children)); }
 | 	vdeclarations pidentifier'('num')'	{ struct node *children[2] = {$2, $4};
 										  add_child("VDEC",$1, add_node(2, "VDEC_TABLE", children));
 										}
@@ -100,8 +103,10 @@ command:
 | 	WHILE condition DO commands ENDWHILE							{ struct node *children[2] = {$2, $4};
 																	  $$ = add_node(2, "WHILE", children); 	  }
 | 	FOR pidentifier FROM value TO value DO commands ENDFOR			{ struct node *children[4] = {$2, $4, $6, $8};
+																	  children[0]->type = "ITERATOR";
 																	  $$ = add_node(4, "FOR", children); }
 | 	FOR pidentifier DOWN FROM value TO value DO commands ENDFOR %prec FOR_DOWN { struct node *children[4] = {$2, $5, $7, $9};
+																				 children[0]->type = "ITERATOR";
 																				 $$ = add_node(4, "FOR_DOWN", children); }
 | 	GET identifier ';'												{ struct node *children[1] = {$2};
 																	  $$ = add_node(1, "GET", children); }

@@ -1,7 +1,14 @@
 DECLARE
-    a c b t(100)
+ 	a b c t(100)
 IN
 	FOR i DOWN FROM 10 TO 0 DO
-		a := 10;
+		b := 10;
+		c := 2;
 	ENDFOR
+
+	IF a < 20 THEN
+		b := 2;
+	ELSE 
+		c := 2;
+	ENDIF
 END
