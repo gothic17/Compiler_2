@@ -66,12 +66,10 @@ void post_order (node *p) {
 			post_order(p->children[i]);
 			i++;
 		}
-		printf("%s\n", p->string);
-		//interpret(p);
+		//printf("%s\n", p->string);
 	}
 	else {
-		printf("%s\n", p->string);
-		//interpret(p);
+		//printf("%s\n", p->string);
 	}
 }
 
@@ -98,13 +96,15 @@ void add_error(error *new_error) {
 		errors_list_root->next = NULL;
 	}
 	else {
-		error *current = errors_list_root;
-		while(current->next != NULL) {
-			current = current->next;
-		}
+		if(find_error(new_error->string, new_error->first_line) == 0) {
+			error *current = errors_list_root;
+			while(current->next != NULL) {
+				current = current->next;
+			}
 
-		new_error->next = current->next;
-		current->next = new_error;
+			new_error->next = current->next;
+			current->next = new_error;
+		}
 	}
 }
 /* remove_error - usuwa z listy błędów (zaczynającej się od korzenia root) błąd x */
@@ -123,21 +123,36 @@ void remove_error(error *x) {
    if (temp != NULL) free(temp);
 }
 
-/* find_error szuka elementu x w liście błędów, zwraca jego adres albo null, gdy lista nie zawiera
- * elementu x.*/
-error *find_error(error *x) {
+/* find_error sprawdza, czy został już dodany błąd z takim samym komunikatem zgloszonym
+ * dla danej linii. */
+int find_error(char *searched_string, int first_line) {
 	error *temp = errors_list_root;
-	while (temp != NULL && temp != x) {
+	while (temp != NULL) {
+		if(strcmp(temp->string, searched_string) == 0 && temp->first_line == first_line) return 1;
 		temp = temp->next;
 	}
-	return temp;
+	return 0;
 }
 
-void print_errors() {
+void print_errors(char *filename) {
+	FILE *file;
+	char *line = NULL;
+	size_t len = 0;
+
 	error *temp = errors_list_root;
 	while(temp != NULL) {
 		if (strcmp(temp->string, "ROOT_ERROR") != 0) {
-			printf("Error: %d.%d - %d.%d - %s\n", temp->first_line, temp->first_column, temp->last_line, temp->last_column, temp->string);
+			// Znajdź linie w pliku, w której wystapil błąd
+			file = fopen(filename, "r");
+			int n = temp->first_line;
+			while(n > 0) {
+				getline(&line, &len, file);
+				n--;
+			}
+			printf("Error: %d.%d - %d.%d - %s w linii: \n%s", temp->first_line,
+					temp->first_column, temp->last_line, temp->last_column,
+					temp->string, line);
+			fclose(file);
 		}
 		temp = temp->next;
 	}
@@ -223,18 +238,19 @@ void remove_symbols_sublist() {
 
 /* search_for_symbol - zwraca 1, jesli symbol został znaleziony i 0 w p.p. */
 int search_for_symbol(char *symbol_name) {
+	int symbol_found = 0;
 	symbols_list *temp = symbols_list_root;
 
 	while (temp != NULL) {
 		struct symbol *temp_symbol = temp->data;
 		while(temp_symbol != NULL) {
-			if (strcmp(temp_symbol->string, symbol_name) == 0) return 1;
+			if (strcmp(temp_symbol->string, symbol_name) == 0) symbol_found = 1;
 			temp_symbol = temp_symbol->next;
 		}
 		temp = temp->next;
 	}
 
-	return 0;
+	return symbol_found;
 }
 
 /* Zwraca 0, jesli symbol nie zostal zadeklarowany w ostatniej podliście (mógł byc zadeklarowany
@@ -256,17 +272,20 @@ int check_if_symbol_already_declared(char *symbol_name) {
 
 // Zwraca znaleziony symbol, lub NULL, jesli nie znalazł symbolu.
 symbol *find_symbol(char *symbol_name) {
+	symbol *searched_symbol = NULL;
 	symbols_list *temp = symbols_list_root;
 	//Przejdź do ostatniej podlisty
-	while(temp->next != NULL) temp = temp->next;
+	while(temp != NULL) {
+		symbol *temp_symbol = temp->data;
+		while(temp_symbol != NULL) {
+			if (strcmp(temp_symbol->string, symbol_name) == 0) searched_symbol = temp_symbol;
+			temp_symbol = temp_symbol->next;
+		}
 
-	symbol *temp_symbol = temp->data;
-	while(temp_symbol != NULL) {
-		if (strcmp(temp_symbol->string, symbol_name) == 0) return temp_symbol;
-		temp_symbol = temp_symbol->next;
+		temp = temp->next;
 	}
 
-	return NULL;
+	return searched_symbol;
 }
 
 void print_symbols() {
@@ -342,9 +361,9 @@ void main(int argc, char **argv) {
 	/***** Czytanie z pliku i parser******/
 	char temp[4] = {argv[1][strlen(argv[1])-4], argv[1][strlen(argv[1])-3], argv[1][strlen(argv[1])-2], argv[1][strlen(argv[1])-1]};
 
-	FILE *file = fopen(argv[1], "r");
+	FILE *read_file = fopen(argv[1], "r");
 
-	if (file == NULL) {
+	if (read_file == NULL) {
 		printf("Nie udalo sie otworzyc pliku %s.", argv[1]);
 	    exit(0);
 	}
@@ -353,31 +372,58 @@ void main(int argc, char **argv) {
 		exit(0);
 	}
 
-	yyin = file;
+	yyin = read_file;
 
 	do {
 		yyparse(errors_list_root);
 	} while(!feof(yyin));
 
-	fclose(file);
+	fclose(read_file);
 
 	/******* Zmienne do translacji ******/
 	new_address_counter = 0;
+	new_table_address_counter = 0;
 	new_label_counter = 0;
 	address_counter = 0;
 
+	contains_errors = 0;
 	number_of_programs = -1;
 	/***********************************/
 
-	translate(AST_root);
+	if(errors_list_root != NULL) {
+		printf("\n---------Błędy-------------\n");
+			print_errors(argv[1]);
+	}
+	else {
 
-	printf("-----Tablica symboli-------\n");
-	print_symbols();
+		translate(AST_root);
 
-	printf("-----Kod trójadresowy------\n");
-	print_fours();
+		if(errors_list_root != NULL) {
+			printf("\n---------Błędy-------------\n");
+			print_errors(argv[1]);
+		}
+		else {
 
-	printf("---------Błędy-------------\n");
-	print_errors();
+			printf("-----Tablica symboli-------\n");
+			print_symbols();
 
+			printf("-----Kod trójadresowy------\n");
+			print_fours();
+
+			char *write_file_name = calloc(strlen(argv[1]) - 1, sizeof(char));
+				strncat(write_file_name, argv[1], strlen(argv[1])-4);
+				strcat(write_file_name, ".mr");
+				FILE *write_file = fopen(write_file_name, "w");
+			/*
+				if (write_file == NULL) {
+					printf("Nie udalo sie otworzyc pliku %s.", write_file_name);
+				    exit(0);
+				}*/
+			/*
+				int i;
+				for (i = 0; i < k; i++) {
+					fprintf(write_file, "%s %s %s\n", assembler[i]->order, assembler[i]->arg1, assembler[i]->arg2);
+				}*/
+		}
+	}
 }

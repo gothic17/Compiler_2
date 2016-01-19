@@ -4,6 +4,8 @@
 /****** POMOCNICZE ZMIENNE ********/
 int new_address_counter; // Pozwala na tworzenie nowych adresów to tablicy symboli (np. t1, t2...)
 int new_label_counter; // Pozwala na tworzenie nowych etykiet do kodu trójadresowego (np. L0 ...)
+int new_table_address_counter; // Pozwala na tworzenie nowych adresów, w których beda zapamiętywane \
+										adresy z tablic
 int address_counter; // Pozwala na przypisywanie miejsca w pamięci nowo utworzonym zmiennym
 
 int number_of_programs; // Pozwala na rozpoznanie, ile jest zagnieżdżonych programow
@@ -43,7 +45,8 @@ typedef struct error {
 /******* Korzen listy błędów *******/
 static error *errors_list_root;
 
-
+/****** Contains_errors ***********/
+int contains_errors; // Ustawione na 1, jesli program zawiera błędy i 0, jesli nie zawiera
 
 /****** LISTA SYMBOLI *************/
 
@@ -121,7 +124,7 @@ void post_order(node *p);
 error *create_error(char *string, int first_line, int first_column, int last_line, int last_column);
 void add_error(error *x);
 void remove_error(error *x);
-error *find_error(error *x);
+int find_error(char *searched_string, int first_line);
 void print_errors();
 
 // Lista symboli

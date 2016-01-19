@@ -34,6 +34,25 @@ char *generate_new_address() {
 	return string;
 }
 
+char *generate_new_table_address() {
+	// Count the number of digits
+	int temp = new_table_address_counter;
+	int count = 0;
+	while (temp > 0) {
+	    count++;
+	    temp /= 10;
+	}
+
+	char *string = calloc(count + 1, sizeof(char));
+	char *number_buffer = malloc(count * sizeof(char) + 1);
+	sprintf(number_buffer, "%d", new_table_address_counter);
+	strcat(string, "r");
+	strcat(string, number_buffer);
+	new_table_address_counter++;
+
+	return string;
+}
+
 char *generate_new_label() {
 	// Count the number of digits
 	int temp = new_label_counter;
@@ -53,36 +72,128 @@ char *generate_new_label() {
 	return string;
 }
 
-void interpret(node *p) {
-
-	if (strcmp(p->string, ":=") == 0) {
-		if(is_numeric(p->children[0]->string) == 0) {
+int check_table(node *p) {
+	if(is_numeric(p->children[0]->string) == 0) {
+		//Sprawdzenie, czy lewy argument jest tablicą. Jesli tak, to zła konstrukcja
+		if(strcmp(p->children[0]->string, "TABLE") == 0) {
+			char *string = calloc(strlen("Niewłaściwe użycie zmiennej: ") + strlen(p->children[0]->children[0]->string), sizeof(char));
+			strcat(string, "Niewłaściwe użycie zmiennej: ");
+			strcat(string, p->children[0]->children[0]->string);
+			add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+					p->children[0]->last_line, p->children[0]->last_column));
+			return 0;
+		}
+		else {
 			if(search_for_symbol(p->children[0]->string) == 0) {
 				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
 				strcat(string, "Nie zadeklarowano zmiennej: ");
 				strcat(string, p->children[0]->string);
 				add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 						p->children[0]->last_line, p->children[0]->last_column));
+				return 0;
 			}
-			// Sprawdzenie, czy nie bedziemy modyfikować iteratora petli
-			symbol *found_symbol = find_symbol(p->children[0]->string);
-			if(found_symbol != NULL && strcmp(found_symbol->type, "ITERATOR") == 0) {
-				char *string = calloc(strlen("Próba zmiany iteratora '") + strlen(p->children[0]->string +
-						strlen("' wewnątrz petli")), sizeof(char));
-				strcat(string, "Próba zmiany iteratora '");
-				strcat(string, p->children[0]->string);
-				strcat(string, "' wewnątrz petli");
-				add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-						p->children[0]->last_line, p->children[0]->last_column));
+			if((search_for_symbol(p->children[0]->string) == 1) &&
+					(strcmp(find_symbol(p->children[0]->string)->type, "ID") == 0 ||
+							strcmp(find_symbol(p->children[0]->string)->type, "ITERATOR") == 0	)) {
+					char *string = calloc(strlen("Błędne użycie zmiennej: '") + strlen(p->children[0]->string) + strlen("' jako tablicy"), sizeof(char));
+					strcat(string, "Próba użycia zmiennej: '");
+					strcat(string, p->children[0]->string);
+					strcat(string, "' jako tablicy");
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+					p->children[0]->last_line, p->children[0]->last_column));
+					return 0;
+			}
+		}
+	}
+	if(is_numeric(p->children[1]->string) == 0) {
+		if(search_for_symbol(p->children[1]->string) == 0) {
+			char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
+			strcat(string, "Nie zadeklarowano zmiennej: ");
+			strcat(string, p->children[1]->string);
+			add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+					p->children[1]->last_line, p->children[1]->last_column));
+			return 0;
+		}
+	}
+	return 1;
+}
+
+void interpret(node *p) {
+
+	if (strcmp(p->string, ":=") == 0) {
+		if(is_numeric(p->children[0]->string) == 0) {
+			//Sprawdzenie, czy lewy argument jest tablicą
+			if(strcmp(p->children[0]->string, "TABLE") == 0) {
+				check_table(p->children[0]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[0]->string = symbol_name;
+
+				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[0]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+				// Sprawdzenie, czy nie bedziemy modyfikować iteratora petli
+				symbol *found_symbol = find_symbol(p->children[0]->string);
+				if(found_symbol != NULL && strcmp(found_symbol->type, "ITERATOR") == 0) {
+					char *string = calloc(strlen("Próba zmiany iteratora '") + strlen(p->children[0]->string) +
+							strlen("' wewnątrz petli"), sizeof(char));
+					strcat(string, "Próba zmiany iteratora '");
+					strcat(string, p->children[0]->string);
+					strcat(string, "' wewnątrz petli");
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
 			}
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
-			if(search_for_symbol(p->children[1]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[1]->string);
-				add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-										p->children[1]->last_line, p->children[1]->last_column));
+			// Sprawdzenie, czy prawy argument przypisania jest tablicą
+			if(strcmp(p->children[1]->string, "TABLE") == 0) {
+				check_table(p->children[1]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[1]->string = symbol_name;
+
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[1]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
 			}
 		}
 
@@ -90,31 +201,141 @@ void interpret(node *p) {
 	}
 
 	if (strcmp(p->string, "GET") == 0) {
+		if(is_numeric(p->children[0]->string) == 0) {
+			//Sprawdzenie, czy argument jest tablicą
+			if(strcmp(p->children[0]->string, "TABLE") == 0) {
+				check_table(p->children[0]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[0]->string = symbol_name;
+
+				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[0]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+			}
+		}
 		add_four("GET", p->children[0]->string, "", "", p->children[0]->string);
 	}
 
 	if (strcmp(p->string, "PUT") == 0) {
+		if(is_numeric(p->children[0]->string) == 0) {
+			//Sprawdzenie, czy argument jest tablicą
+			if(strcmp(p->children[0]->string, "TABLE") == 0) {
+				check_table(p->children[0]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[0]->string = symbol_name;
+
+				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[0]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+			}
+		}
 		add_four("PUT", p->children[0]->string, "", "", p->children[0]->string);
 	}
 
 	if (strcmp(p->string, "+") == 0) {
 		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
-			if(search_for_symbol(p->children[0]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[0]->string);
-				add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-						p->children[0]->last_line, p->children[0]->last_column));
+			//Sprawdzenie, czy lewy argument jest tablicą
+			if(strcmp(p->children[0]->string, "TABLE") == 0) {
+				check_table(p->children[0]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[0]->string = symbol_name;
+
+				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[0]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
 			}
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
-			if(search_for_symbol(p->children[1]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[1]->string);
-				add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-										p->children[1]->last_line, p->children[1]->last_column));
+			// Sprawdzenie, czy prawy argument jest tablicą
+			if(strcmp(p->children[1]->string, "TABLE") == 0) {
+				check_table(p->children[1]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[1]->string = symbol_name;
+
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[1]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
 			}
 		}
 
@@ -131,22 +352,69 @@ void interpret(node *p) {
 	}
 
 	if (strcmp(p->string, "-") == 0) {
+		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
-			if(search_for_symbol(p->children[0]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[0]->string);
-				add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-						p->children[0]->last_line, p->children[0]->last_column));
+			//Sprawdzenie, czy lewy argument jest tablicą
+			if(strcmp(p->children[0]->string, "TABLE") == 0) {
+				check_table(p->children[0]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[0]->string = symbol_name;
+
+				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[0]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
 			}
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
-			if(search_for_symbol(p->children[1]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[1]->string);
-				add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-										p->children[1]->last_line, p->children[1]->last_column));
+			// Sprawdzenie, czy prawy argument jest tablicą
+			if(strcmp(p->children[1]->string, "TABLE") == 0) {
+				check_table(p->children[1]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[1]->string = symbol_name;
+
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[1]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
 			}
 		}
 
@@ -162,24 +430,72 @@ void interpret(node *p) {
 	}
 
 	if (strcmp(p->string, "*") == 0) {
+		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
-			if(search_for_symbol(p->children[0]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[0]->string);
-				add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-						p->children[0]->last_line, p->children[0]->last_column));
+			//Sprawdzenie, czy lewy argument jest tablicą
+			if(strcmp(p->children[0]->string, "TABLE") == 0) {
+				check_table(p->children[0]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[0]->string = symbol_name;
+
+				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[0]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
 			}
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
-			if(search_for_symbol(p->children[1]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[1]->string);
-				add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-										p->children[1]->last_line, p->children[1]->last_column));
+			// Sprawdzenie, czy prawy argument jest tablicą
+			if(strcmp(p->children[1]->string, "TABLE") == 0) {
+				check_table(p->children[1]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[1]->string = symbol_name;
+
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[1]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
 			}
 		}
+
 
 
 		char *symbol_name = generate_new_address();
@@ -193,24 +509,72 @@ void interpret(node *p) {
 	}
 
 	if (strcmp(p->string, "/") == 0) {
+		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
-			if(search_for_symbol(p->children[0]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[0]->string);
-				add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-						p->children[0]->last_line, p->children[0]->last_column));
+			//Sprawdzenie, czy lewy argument jest tablicą
+			if(strcmp(p->children[0]->string, "TABLE") == 0) {
+				check_table(p->children[0]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[0]->string = symbol_name;
+
+				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[0]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
 			}
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
-			if(search_for_symbol(p->children[1]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[1]->string);
-				add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-										p->children[1]->last_line, p->children[1]->last_column));
+			// Sprawdzenie, czy prawy argument jest tablicą
+			if(strcmp(p->children[1]->string, "TABLE") == 0) {
+				check_table(p->children[1]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[1]->string = symbol_name;
+
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[1]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
 			}
 		}
+
 
 
 		char *symbol_name = generate_new_address();
@@ -224,24 +588,72 @@ void interpret(node *p) {
 	}
 
 	if (strcmp(p->string, "%") == 0) {
+		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
-			if(search_for_symbol(p->children[0]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[0]->string);
-				add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-						p->children[0]->last_line, p->children[0]->last_column));
+			//Sprawdzenie, czy lewy argument jest tablicą
+			if(strcmp(p->children[0]->string, "TABLE") == 0) {
+				check_table(p->children[0]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[0]->string = symbol_name;
+
+				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[0]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
 			}
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
-			if(search_for_symbol(p->children[1]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[1]->string);
-				add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-										p->children[1]->last_line, p->children[1]->last_column));
+			// Sprawdzenie, czy prawy argument jest tablicą
+			if(strcmp(p->children[1]->string, "TABLE") == 0) {
+				check_table(p->children[1]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[1]->string = symbol_name;
+
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[1]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
 			}
 		}
+
 
 
 		char *symbol_name = generate_new_address();
@@ -255,24 +667,72 @@ void interpret(node *p) {
 	}
 
 	if (strcmp(p->string, "=") == 0) {
+		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
-			if(search_for_symbol(p->children[0]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[0]->string);
-				add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-						p->children[0]->last_line, p->children[0]->last_column));
+			//Sprawdzenie, czy lewy argument jest tablicą
+			if(strcmp(p->children[0]->string, "TABLE") == 0) {
+				check_table(p->children[0]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[0]->string = symbol_name;
+
+				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[0]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
 			}
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
-			if(search_for_symbol(p->children[1]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[1]->string);
-				add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-										p->children[1]->last_line, p->children[1]->last_column));
+			// Sprawdzenie, czy prawy argument jest tablicą
+			if(strcmp(p->children[1]->string, "TABLE") == 0) {
+				check_table(p->children[1]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[1]->string = symbol_name;
+
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[1]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
 			}
 		}
+
 
 
 		char *symbol_name = generate_new_address();
@@ -286,24 +746,72 @@ void interpret(node *p) {
 	}
 
 	if (strcmp(p->string, "!=") == 0) {
+		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
-			if(search_for_symbol(p->children[0]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[0]->string);
-				add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-						p->children[0]->last_line, p->children[0]->last_column));
+			//Sprawdzenie, czy lewy argument jest tablicą
+			if(strcmp(p->children[0]->string, "TABLE") == 0) {
+				check_table(p->children[0]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[0]->string = symbol_name;
+
+				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[0]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
 			}
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
-			if(search_for_symbol(p->children[1]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[1]->string);
-				add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-										p->children[1]->last_line, p->children[1]->last_column));
+			// Sprawdzenie, czy prawy argument jest tablicą
+			if(strcmp(p->children[1]->string, "TABLE") == 0) {
+				check_table(p->children[1]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[1]->string = symbol_name;
+
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[1]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
 			}
 		}
+
 
 
 		char *symbol_name = generate_new_address();
@@ -317,24 +825,72 @@ void interpret(node *p) {
 	}
 
 	if (strcmp(p->string, "<") == 0) {
+		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
-			if(search_for_symbol(p->children[0]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[0]->string);
-				add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-						p->children[0]->last_line, p->children[0]->last_column));
+			//Sprawdzenie, czy lewy argument jest tablicą
+			if(strcmp(p->children[0]->string, "TABLE") == 0) {
+				check_table(p->children[0]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[0]->string = symbol_name;
+
+				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[0]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
 			}
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
-			if(search_for_symbol(p->children[1]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[1]->string);
-				add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-										p->children[1]->last_line, p->children[1]->last_column));
+			// Sprawdzenie, czy prawy argument jest tablicą
+			if(strcmp(p->children[1]->string, "TABLE") == 0) {
+				check_table(p->children[1]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[1]->string = symbol_name;
+
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[1]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
 			}
 		}
+
 
 
 		char *symbol_name = generate_new_address();
@@ -348,24 +904,72 @@ void interpret(node *p) {
 	}
 
 	if (strcmp(p->string, ">") == 0) {
+		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
-			if(search_for_symbol(p->children[0]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[0]->string);
-				add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-						p->children[0]->last_line, p->children[0]->last_column));
+			//Sprawdzenie, czy lewy argument jest tablicą
+			if(strcmp(p->children[0]->string, "TABLE") == 0) {
+				check_table(p->children[0]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[0]->string = symbol_name;
+
+				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[0]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
 			}
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
-			if(search_for_symbol(p->children[1]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[1]->string);
-				add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-										p->children[1]->last_line, p->children[1]->last_column));
+			// Sprawdzenie, czy prawy argument jest tablicą
+			if(strcmp(p->children[1]->string, "TABLE") == 0) {
+				check_table(p->children[1]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[1]->string = symbol_name;
+
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[1]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
 			}
 		}
+
 
 
 		char *symbol_name = generate_new_address();
@@ -379,24 +983,72 @@ void interpret(node *p) {
 	}
 
 	if (strcmp(p->string, "<=") == 0) {
+		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
-			if(search_for_symbol(p->children[0]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[0]->string);
-				add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-						p->children[0]->last_line, p->children[0]->last_column));
+			//Sprawdzenie, czy lewy argument jest tablicą
+			if(strcmp(p->children[0]->string, "TABLE") == 0) {
+				check_table(p->children[0]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[0]->string = symbol_name;
+
+				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[0]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
 			}
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
-			if(search_for_symbol(p->children[1]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[1]->string);
-				add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-										p->children[1]->last_line, p->children[1]->last_column));
+			// Sprawdzenie, czy prawy argument jest tablicą
+			if(strcmp(p->children[1]->string, "TABLE") == 0) {
+				check_table(p->children[1]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[1]->string = symbol_name;
+
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[1]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
 			}
 		}
+
 
 
 		char *symbol_name = generate_new_address();
@@ -410,24 +1062,72 @@ void interpret(node *p) {
 	}
 
 	if (strcmp(p->string, ">=") == 0) {
+		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
-			if(search_for_symbol(p->children[0]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[0]->string);
-				add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-						p->children[0]->last_line, p->children[0]->last_column));
+			//Sprawdzenie, czy lewy argument jest tablicą
+			if(strcmp(p->children[0]->string, "TABLE") == 0) {
+				check_table(p->children[0]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[0]->string = symbol_name;
+
+				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[0]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[0]->string);
+					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+							p->children[0]->last_line, p->children[0]->last_column));
+				}
 			}
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
-			if(search_for_symbol(p->children[1]->string) == 0) {
-				char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
-				strcat(string, "Nie zadeklarowano zmiennej: ");
-				strcat(string, p->children[1]->string);
-				add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-										p->children[1]->last_line, p->children[1]->last_column));
+			// Sprawdzenie, czy prawy argument jest tablicą
+			if(strcmp(p->children[1]->string, "TABLE") == 0) {
+				check_table(p->children[1]);
+				//Dodanie czwórki przypisania wartości do komórki w tablicy
+				char *symbol_name = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+				address_counter++;
+				add_symbol(new_symbol);
+				p->children[1]->string = symbol_name;
+
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+			}
+			else {
+				if(search_for_symbol(p->children[1]->string) == 0) {
+					char *string = calloc(strlen("Nie zadeklarowano zmiennej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Nie zadeklarowano zmiennej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
+				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+					strcat(string, "Złe użycie zmiennej tablicowej: ");
+					strcat(string, p->children[1]->string);
+					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+							p->children[1]->last_line, p->children[1]->last_column));
+				}
 			}
 		}
+
 
 
 		char *symbol_name = generate_new_address();
@@ -449,6 +1149,7 @@ void translate(node *p) {
 	if(strcmp(p->string, "VDEC") == 0) {
 		add_symbols_sublist();
 		while (i < p->number_of_children) {
+
 			if(check_if_symbol_already_declared(p->children[i]->string) == 1) {
 				char *string = calloc(strlen("Zmienna '") + strlen(p->children[i]->string) +
 						strlen("' została już wczesniej zadeklarowana."), sizeof(char));
@@ -624,7 +1325,7 @@ void translate(node *p) {
 
 		add_four("", "", "", "", new_label_2);
 		// Usunięcie ostatniej podlisty
-		remove_symbols_sublist();
+		//remove_symbols_sublist();
 	}
 
 	else if (strcmp(p->string, "FOR_DOWN") == 0) {
@@ -681,7 +1382,7 @@ void translate(node *p) {
 
 		add_four("", "", "", "", new_label_2);
 		// Usunięcie ostatniej podlisty
-		remove_symbols_sublist();
+		//remove_symbols_sublist();
 	}
 
 	else {

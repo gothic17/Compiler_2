@@ -30,6 +30,7 @@ void lyyerror(YYLTYPE t, error *errors_list_root, int n, char *s, ...);
 
 %union {
 	struct node *node_pointer;
+	char *string;
 };
 
 
@@ -63,12 +64,13 @@ void lyyerror(YYLTYPE t, error *errors_list_root, int n, char *s, ...);
 %nonassoc <node_pointer> IF_ELSE
 %nonassoc <node_pointer> FOR_DOWN
 
+%token <node_pointer> error
+/*%destructor { free($$); } error*/
 
 %% /**********The grammar follows. ****************/ 
 
 program:
-	DECLARE vdeclarations IN commands END { number_of_programs++;
-											struct node *children[3] = {$2, $4, $5};
+	DECLARE vdeclarations IN commands END { struct node *children[3] = {$2, $4, $5};
 											$$ = add_node(2, "DECLARE", children);
 										    post_order($$); 
 										    //free_node($$); 
@@ -84,12 +86,16 @@ vdeclarations:
 										}
 | 	%empty								{ struct node *children[0];
 										  $$ = add_node(0, "VDEC", children); 				    }
+|	error 	{ $$ = $1;
+			  yyclearin; /* discard lookahead */
+              yyerrok;
+              lyyerror(@1, errors_list_root, 1, "Oczekiwano 'vdeclaration'");}
 ;
 
 commands:
 	commands command	{ add_child("COMMANDS",$1, $2); }
 |	%empty				{ struct node *children[0];
-						  $$ = add_node(0, "COMMANDS", children);	}
+						  $$ = add_node(0, "COMMANDS", children);	}				  
 ;
 
 command:
@@ -112,6 +118,10 @@ command:
 																	  $$ = add_node(1, "GET", children); }
 | 	PUT value ';'													{ struct node *children[1] = {$2};
 																	  $$ = add_node(1, "PUT", children); }
+|	error '\n' { $$ = $1;
+			  yyclearin; /* discard lookahead */
+              yyerrok;
+              lyyerror(@1, errors_list_root, 1, "Oczekiwano 'command'");}
 ;
 
 expression:
@@ -126,6 +136,10 @@ expression:
 						  $$ = add_node(2, "/", children); }
 | 	value '%' value		{ struct node *children[2] = {$1, $3};
 						  $$ = add_node(2, "%", children); }
+|	error ';'	{ $$ = $1;
+			  yyclearin; /* discard lookahead */
+              yyerrok;
+              lyyerror(@1, errors_list_root, 1, "Oczekiwano 'expression'");}
 ;
 
 condition:
@@ -141,12 +155,15 @@ condition:
 								  $$ = add_node(2, "<=", children); }
 | 	value BIGGEREQUAL value		{ struct node *children[2] = {$1, $3};
 								  $$ = add_node(2, ">=", children); }
+|	error 	{ $$ = $1;
+			  yyclearin; /* discard lookahead */
+              yyerrok;
+              lyyerror(@1, errors_list_root, 1, "Oczekiwano 'condition'");}
 ;
 
 value:
 	num			{$$ = $1;}
 | 	identifier	{$$ = $1;}
-|	command		{lyyerror(@1, errors_list_root, 3, "Znaleziono command: '", $1->string, "' w miejscu value");}
 ;
 
 identifier:
@@ -159,8 +176,9 @@ identifier:
 
 %%
 
-
+// Standardowa funkcja uruchamiana przy znalezieniu błędu. 
 void yyerror(error *errors_list_root, char *s, ...) {
+ /***** NIC NIE ROBI ******/
   va_list ap;
   va_start(ap, s);
 
@@ -169,6 +187,8 @@ void yyerror(error *errors_list_root, char *s, ...) {
 	    yylloc.last_line, yylloc.last_column);
   vfprintf(stderr, s, ap);
   fprintf(stderr, "\n");
+  
+  lyyerror(yylloc, errors_list_root, 1, s);
 }
 
 /* n - liczba char* do przekazania. */
@@ -193,7 +213,6 @@ void lyyerror(YYLTYPE t, error *errors_list_root, int n, char *s, ...) {
 	buffer--;
   }
   
-  while (errors_list_root->next != NULL) errors_list_root = errors_list_root->next;
   add_error(create_error(temp, t.first_line, t.first_column, t.last_line, t.last_column));
 
 }

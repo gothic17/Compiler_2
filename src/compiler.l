@@ -91,5 +91,4 @@ int yycolumn = 1;
 				yylval.node_pointer->type = strdup("ID");
 				return pidentifier;}
 
-
 %%

@@ -1,14 +1,10 @@
 DECLARE
- 	zmiennaa zmiennab zmiennac mkdlwamdklwmlkdwa mdwkladmwkla dmwlkadmwklamdkwladmkw a b c t(100)
+ a b c t(100)
 IN
-	FOR i DOWN FROM 10 TO 0 DO
-		b := 10;
-		c := 2;
-	ENDFOR
+	a := b + t(2);
+	a := b - t(2);
+	a := b * t(2);
+	a := b / t(2);
+	a := b % t(2);
 
-	IF a < 20 THEN
-		b := 2;
-	ELSE 
-		c := 2;
-	ENDIF
 END
