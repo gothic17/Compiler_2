@@ -59,17 +59,19 @@ void free_node(node *p) {
 }
 
 void post_order (node *p) {
-	if (strcmp(p->string, "DECLARE") == 0 && AST_root == NULL) AST_root = p;
+	if (strcmp(p->string, "DECLARE") == 0 && AST_root == NULL) {
+		AST_root = p;
+	}
 	int i = 0;
 	if (p->number_of_children != 0) {
 		while (i < p->number_of_children) {
 			post_order(p->children[i]);
 			i++;
 		}
-		//printf("%s\n", p->string);
+		printf("%s\n", p->string);
 	}
 	else {
-		//printf("%s\n", p->string);
+		printf("%s\n", p->string);
 	}
 }
 
@@ -181,6 +183,7 @@ symbol *create_symbol(char *string, char *type, int address, int size, int first
 void add_symbol(symbol *symbol) {
 	symbols_list *temp_sublist = symbols_list_root;
 
+
 	while(temp_sublist->next != NULL) {
 		temp_sublist = temp_sublist->next;
 	}
@@ -263,7 +266,9 @@ int check_if_symbol_already_declared(char *symbol_name) {
 
 	symbol *temp_symbol = temp->data;
 	while(temp_symbol != NULL) {
-		if (strcmp(temp_symbol->string, symbol_name) == 0) return 1;
+		if (strcmp(temp_symbol->string, symbol_name) == 0) {
+			return 1;
+		}
 		temp_symbol = temp_symbol->next;
 	}
 
@@ -295,7 +300,7 @@ void print_symbols() {
 		symbol *temp_symbol = symbols_sublist->data;
 		while(temp_symbol != NULL) {
 			if(strcmp(temp_symbol->string, "ROOT_SYMBOL") != 0) {
-				printf("%*s %*s %*d %*d\n", 5, temp_symbol->string, 7, temp_symbol->type,
+				printf("%*s %*s %*lu %*lu\n", 5, temp_symbol->string, 7, temp_symbol->type,
 						5, temp_symbol->address,
 						5, temp_symbol->size);
 			}
@@ -348,6 +353,9 @@ void main(int argc, char **argv) {
 	/******* Korzen listy symboli *********/
 	symbols_list_root = NULL;
 
+	/******* Korzen listy zainicjowanych symboli ******/
+	initialized_symbols_list_root = NULL;
+
 	/****** Korzeń drzewa AST *************/
 	AST_root = malloc(sizeof(node));
 	AST_root = NULL;
@@ -364,7 +372,7 @@ void main(int argc, char **argv) {
 	FILE *read_file = fopen(argv[1], "r");
 
 	if (read_file == NULL) {
-		printf("Nie udalo sie otworzyc pliku %s.", argv[1]);
+		printf("Nie udalo sie otworzyc pliku %s.\n", argv[1]);
 	    exit(0);
 	}
 	else if (strcmp(temp, ".imp") != 0) {
@@ -395,7 +403,6 @@ void main(int argc, char **argv) {
 			print_errors(argv[1]);
 	}
 	else {
-
 		translate(AST_root);
 
 		if(errors_list_root != NULL) {
@@ -406,6 +413,9 @@ void main(int argc, char **argv) {
 
 			printf("-----Tablica symboli-------\n");
 			print_symbols();
+
+			printf("-----Tablica zainicjowanych symboli----\n");
+			print_initialized_symbols();
 
 			printf("-----Kod trójadresowy------\n");
 			print_fours();

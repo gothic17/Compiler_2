@@ -72,6 +72,132 @@ char *generate_new_label() {
 	return string;
 }
 
+/*********** INICJALIZACJA **********/
+void initialize(char *symbol_name) {
+	if(check_if_symbol_was_initialized(symbol_name) == 0) {
+		initialized_symbols_list *temp = initialized_symbols_list_root;
+
+		initialized_symbol *symbol_found = malloc(sizeof(initialized_symbol));
+		symbol_found = NULL;
+		initialized_symbol *temp_symbol = temp->data;
+		while(temp != NULL) {
+			while(temp_symbol != NULL) {
+				if (strcmp(temp_symbol->string, symbol_name) == 0) {
+					symbol_found = temp_symbol;
+				}
+				temp_symbol = temp_symbol->next;
+			}
+			temp = temp->next;
+		}
+
+		if(symbol_found != NULL) {
+			symbol_found->initialized = true;
+		}
+	}
+}
+
+void add_initialized_symbol(char *symbol_name) {
+	initialized_symbol *new_symbol = malloc(sizeof(initialized_symbol));
+	new_symbol->string = symbol_name;
+	new_symbol->initialized = false;
+
+	initialized_symbols_list *temp_sublist = initialized_symbols_list_root;
+
+	// Przejdź do ostatniej podlisty
+	while(temp_sublist->next != NULL) {
+		temp_sublist = temp_sublist->next;
+	}
+
+	struct initialized_symbol *temp_symbol = temp_sublist->data;
+
+	while(temp_symbol->next != NULL) {
+		temp_symbol = temp_symbol->next;
+	}
+
+	new_symbol->next = temp_symbol->next;
+	temp_symbol->next = new_symbol;
+}
+
+
+void add_initialized_symbols_sublist() {
+	initialized_symbols_list *new_list = malloc(sizeof(initialized_symbols_list));
+	initialized_symbol *new_symbol =  malloc(sizeof(initialized_symbol));
+	new_symbol->string = "ROOT_INIT_SYMBOL";//Inicjowanie nowej listy symboli symbolem "ROOT_INIT_SYMBOL"
+	new_symbol->next = NULL;
+	new_list->data = new_symbol;
+
+	initialized_symbols_list *temp = initialized_symbols_list_root;
+
+	if(initialized_symbols_list_root == NULL) {
+		initialized_symbols_list_root = malloc(sizeof(initialized_symbols_list));
+		initialized_symbols_list_root->next = NULL;
+		initialized_symbols_list_root->data = new_symbol;
+	}
+	else {
+		while (temp->next != NULL) {
+			temp = temp->next;
+		}
+		new_list->next = temp->next;
+		temp->next = new_list;
+	}
+}
+
+/* remove_initialized_symbols_sublist - usuwa z listy zainicjowanych zmiennych
+ * ostatnią podlistę */
+void remove_initialized_symbols_sublist() {
+	initialized_symbols_list *temp;
+	initialized_symbols_list *previous;
+	temp = initialized_symbols_list_root;
+	while(temp->next != NULL) {
+		previous = temp;
+		temp = temp->next;
+	}
+	if(temp == initialized_symbols_list_root) initialized_symbols_list_root = NULL;
+	else {
+		previous->next = NULL;
+	}
+	if (temp != NULL) free(temp);
+}
+
+
+int check_if_symbol_was_initialized(char *symbol_name) {
+	initialized_symbols_list *temp = initialized_symbols_list_root;
+
+	initialized_symbol *symbol_found = malloc(sizeof(initialized_symbol));
+	symbol_found = NULL;
+	initialized_symbol *temp_symbol = temp->data;
+	while(temp != NULL) {
+		while(temp_symbol != NULL) {
+			if (strcmp(temp_symbol->string, symbol_name) == 0) {
+				symbol_found = temp_symbol;
+			}
+			temp_symbol = temp_symbol->next;
+		}
+		temp = temp->next;
+	}
+
+	if(symbol_found != NULL && symbol_found->initialized == true) return 1;
+	else return 0;
+
+}
+
+void print_initialized_symbols() {
+	initialized_symbols_list *initialized_symbols_sublist = initialized_symbols_list_root;
+
+	while(initialized_symbols_sublist != NULL) {
+		initialized_symbol *temp_symbol = initialized_symbols_sublist->data;
+		while(temp_symbol != NULL) {
+			if(strcmp(temp_symbol->string, "ROOT_INIT_SYMBOL") != 0) {
+				printf("%*s %*d\n", 5, temp_symbol->string, 5, temp_symbol->initialized);
+			}
+			temp_symbol = temp_symbol->next;
+		}
+		initialized_symbols_sublist = initialized_symbols_sublist->next;
+	}
+}
+
+/*************** TRANSLATE *****************/
+
 int check_table(node *p) {
 	if(is_numeric(p->children[0]->string) == 0) {
 		//Sprawdzenie, czy lewy argument jest tablicą. Jesli tak, to zła konstrukcja
@@ -143,6 +269,7 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 							p->children[0]->last_line, p->children[0]->last_column));
 				}
+				else {
 				// Sprawdzenie, czy nie bedziemy modyfikować iteratora petli
 				symbol *found_symbol = find_symbol(p->children[0]->string);
 				if(found_symbol != NULL && strcmp(found_symbol->type, "ITERATOR") == 0) {
@@ -154,13 +281,14 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 							p->children[0]->last_line, p->children[0]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[0]->string);
-					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-							p->children[0]->last_line, p->children[0]->last_column));
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[0]->string);
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
 				}
 			}
 		}
@@ -186,17 +314,26 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
 							p->children[1]->last_line, p->children[1]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[1]->string);
-					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-							p->children[1]->last_line, p->children[1]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[1]->string);
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
+					// Sprawdzenie, czy prawy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[1]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[1]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
 				}
 			}
 		}
 
+		initialize(p->children[0]->string);
 		add_four(":=", p->children[0]->string, "", p->children[1]->string, p->children[0]->string);
 	}
 
@@ -223,16 +360,21 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 							p->children[0]->last_line, p->children[0]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[0]->string);
-					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-							p->children[0]->last_line, p->children[0]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[0]->string);
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
 				}
 			}
 		}
+
+		/*if(strcmp(find_symbol(p->children[0]->string)->type, "ID") == 0)*/
+			initialize(p->children[0]->string);
 		add_four("GET", p->children[0]->string, "", "", p->children[0]->string);
 	}
 
@@ -259,16 +401,25 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 							p->children[0]->last_line, p->children[0]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[0]->string);
-					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-							p->children[0]->last_line, p->children[0]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostala poprawnie użyta
+					if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[0]->string);
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
+					// Sprawdzenie, czy prawy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[0]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[0]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
 				}
 			}
 		}
+
 		add_four("PUT", p->children[0]->string, "", "", p->children[0]->string);
 	}
 
@@ -296,13 +447,21 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 							p->children[0]->last_line, p->children[0]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[0]->string);
-					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-							p->children[0]->last_line, p->children[0]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[0]->string);
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
+					// Sprawdzenie, czy lewy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[0]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[0]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
 				}
 			}
 		}
@@ -328,13 +487,21 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
 							p->children[1]->last_line, p->children[1]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[1]->string);
-					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-							p->children[1]->last_line, p->children[1]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[1]->string);
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
+					// Sprawdzenie, czy prawy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[1]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[1]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
 				}
 			}
 		}
@@ -375,13 +542,21 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 							p->children[0]->last_line, p->children[0]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[0]->string);
-					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-							p->children[0]->last_line, p->children[0]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[0]->string);
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
+					// Sprawdzenie, czy lewy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[0]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[0]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
 				}
 			}
 		}
@@ -407,13 +582,21 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
 							p->children[1]->last_line, p->children[1]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[1]->string);
-					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-							p->children[1]->last_line, p->children[1]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[1]->string);
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
+					// Sprawdzenie, czy prawy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[1]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[1]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
 				}
 			}
 		}
@@ -453,13 +636,21 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 							p->children[0]->last_line, p->children[0]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[0]->string);
-					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-							p->children[0]->last_line, p->children[0]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[0]->string);
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
+					// Sprawdzenie, czy lewy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[0]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[0]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
 				}
 			}
 		}
@@ -485,17 +676,24 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
 							p->children[1]->last_line, p->children[1]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[1]->string);
-					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-							p->children[1]->last_line, p->children[1]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[1]->string);
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
+					// Sprawdzenie, czy prawy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[1]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[1]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
 				}
 			}
 		}
-
 
 
 		char *symbol_name = generate_new_address();
@@ -532,13 +730,21 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 							p->children[0]->last_line, p->children[0]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[0]->string);
-					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-							p->children[0]->last_line, p->children[0]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[0]->string);
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
+					// Sprawdzenie, czy lewy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[0]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[0]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
 				}
 			}
 		}
@@ -564,17 +770,24 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
 							p->children[1]->last_line, p->children[1]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[1]->string);
-					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-							p->children[1]->last_line, p->children[1]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[1]->string);
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
+					// Sprawdzenie, czy prawy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[1]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[1]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
 				}
 			}
 		}
-
 
 
 		char *symbol_name = generate_new_address();
@@ -611,13 +824,21 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 							p->children[0]->last_line, p->children[0]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[0]->string);
-					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-							p->children[0]->last_line, p->children[0]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[0]->string);
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
+					// Sprawdzenie, czy lewy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[0]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[0]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
 				}
 			}
 		}
@@ -643,17 +864,24 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
 							p->children[1]->last_line, p->children[1]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[1]->string);
-					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-							p->children[1]->last_line, p->children[1]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[1]->string);
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
+					// Sprawdzenie, czy prawy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[1]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[1]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
 				}
 			}
 		}
-
 
 
 		char *symbol_name = generate_new_address();
@@ -690,13 +918,21 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 							p->children[0]->last_line, p->children[0]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[0]->string);
-					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-							p->children[0]->last_line, p->children[0]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[0]->string);
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
+					// Sprawdzenie, czy lewy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[0]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[0]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
 				}
 			}
 		}
@@ -722,17 +958,24 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
 							p->children[1]->last_line, p->children[1]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[1]->string);
-					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-							p->children[1]->last_line, p->children[1]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[1]->string);
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
+					// Sprawdzenie, czy prawy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[1]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[1]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
 				}
 			}
 		}
-
 
 
 		char *symbol_name = generate_new_address();
@@ -769,13 +1012,21 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 							p->children[0]->last_line, p->children[0]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[0]->string);
-					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-							p->children[0]->last_line, p->children[0]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[0]->string);
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
+					// Sprawdzenie, czy lewy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[0]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[0]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
 				}
 			}
 		}
@@ -801,17 +1052,24 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
 							p->children[1]->last_line, p->children[1]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[1]->string);
-					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-							p->children[1]->last_line, p->children[1]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[1]->string);
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
+					// Sprawdzenie, czy prawy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[1]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[1]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
 				}
 			}
 		}
-
 
 
 		char *symbol_name = generate_new_address();
@@ -848,13 +1106,21 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 							p->children[0]->last_line, p->children[0]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[0]->string);
-					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-							p->children[0]->last_line, p->children[0]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[0]->string);
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
+					// Sprawdzenie, czy lewy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[0]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[0]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
 				}
 			}
 		}
@@ -880,17 +1146,24 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
 							p->children[1]->last_line, p->children[1]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[1]->string);
-					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-							p->children[1]->last_line, p->children[1]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[1]->string);
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
+					// Sprawdzenie, czy prawy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[1]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[1]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
 				}
 			}
 		}
-
 
 
 		char *symbol_name = generate_new_address();
@@ -927,13 +1200,21 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 							p->children[0]->last_line, p->children[0]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[0]->string);
-					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-							p->children[0]->last_line, p->children[0]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[0]->string);
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
+					// Sprawdzenie, czy lewy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[0]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[0]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
 				}
 			}
 		}
@@ -959,17 +1240,24 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
 							p->children[1]->last_line, p->children[1]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[1]->string);
-					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-							p->children[1]->last_line, p->children[1]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[1]->string);
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
+					// Sprawdzenie, czy prawy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[1]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[1]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
 				}
 			}
 		}
-
 
 
 		char *symbol_name = generate_new_address();
@@ -1006,13 +1294,21 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 							p->children[0]->last_line, p->children[0]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[0]->string);
-					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-							p->children[0]->last_line, p->children[0]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[0]->string);
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
+					// Sprawdzenie, czy lewy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[0]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[0]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
 				}
 			}
 		}
@@ -1038,17 +1334,24 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
 							p->children[1]->last_line, p->children[1]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[1]->string);
-					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-							p->children[1]->last_line, p->children[1]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[1]->string);
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
+					// Sprawdzenie, czy prawy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[1]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[1]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
 				}
 			}
 		}
-
 
 
 		char *symbol_name = generate_new_address();
@@ -1085,13 +1388,21 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
 							p->children[0]->last_line, p->children[0]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[0]->string);
-					add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
-							p->children[0]->last_line, p->children[0]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[0]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[0]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[0]->string);
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
+					// Sprawdzenie, czy lewy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[0]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[0]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[0]->first_line, p->children[0]->first_column,
+								p->children[0]->last_line, p->children[0]->last_column));
+					}
 				}
 			}
 		}
@@ -1117,17 +1428,24 @@ void interpret(node *p) {
 					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
 							p->children[1]->last_line, p->children[1]->last_column));
 				}
-				// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
-				if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
-					char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
-					strcat(string, "Złe użycie zmiennej tablicowej: ");
-					strcat(string, p->children[1]->string);
-					add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
-							p->children[1]->last_line, p->children[1]->last_column));
+				else {
+					// Sprawdzenie, czy zmienna tablicowa zostla poprawnie użyta
+					if(strcmp(find_symbol(p->children[1]->string)->type, "TABLE") == 0) {
+						char *string = calloc(strlen("Złe użycie zmiennej tablicowej: ") + strlen(p->children[1]->string), sizeof(char));
+						strcat(string, "Złe użycie zmiennej tablicowej: ");
+						strcat(string, p->children[1]->string);
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
+					// Sprawdzenie, czy prawy argument zostal zainicjowany
+					else if(strcmp(find_symbol(p->children[1]->string)->type, "ID") == 0 && check_if_symbol_was_initialized(p->children[1]->string) == 0){
+						char *string = "Uzycie niezainicjowanej zmiennej";
+						add_error(create_error(string, p->children[1]->first_line, p->children[1]->first_column,
+								p->children[1]->last_line, p->children[1]->last_column));
+					}
 				}
 			}
 		}
-
 
 
 		char *symbol_name = generate_new_address();
@@ -1148,8 +1466,8 @@ void translate(node *p) {
 	// IF, WHILE ...
 	if(strcmp(p->string, "VDEC") == 0) {
 		add_symbols_sublist();
+		add_initialized_symbols_sublist();
 		while (i < p->number_of_children) {
-
 			if(check_if_symbol_already_declared(p->children[i]->string) == 1) {
 				char *string = calloc(strlen("Zmienna '") + strlen(p->children[i]->string) +
 						strlen("' została już wczesniej zadeklarowana."), sizeof(char));
@@ -1174,6 +1492,8 @@ void translate(node *p) {
 							p->children[i]->last_line, p->children[i]->last_column);
 					address_counter++;
 					add_symbol(new_symbol);
+					// Dodanie initialized_symbol
+					add_initialized_symbol(p->children[i]->string);
 				}
 			}
 			i++;
@@ -1190,6 +1510,7 @@ void translate(node *p) {
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
+
 		// Utwórz etykietę L1 z powyzszego przykładu
 		char *new_label = generate_new_label();
 		p->string = symbol_name;
@@ -1274,6 +1595,7 @@ void translate(node *p) {
 	else if (strcmp(p->string, "FOR") == 0) {
 		// Utworzenie nowej podlisty, w której zadeklarujemy iterator petli FOR
 		add_symbols_sublist();
+		//add_initialized_symbols_sublist();
 		// Dodanie iteratora do nowej podlisty
 		symbol *new_symbol = create_symbol(p->children[0]->string, "ITERATOR", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
@@ -1331,6 +1653,7 @@ void translate(node *p) {
 	else if (strcmp(p->string, "FOR_DOWN") == 0) {
 		// Utworzenie nowej podlisty, w której zadeklarujemy iterator petli FOR
 		add_symbols_sublist();
+		//add_initialized_symbols_sublist();
 		// Dodanie iteratora do nowej podlisty
 		symbol *new_symbol = create_symbol(p->children[0]->string, "ITERATOR", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);

@@ -1,12 +1,14 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+typedef enum { false, true } bool;
+
 /****** POMOCNICZE ZMIENNE ********/
 int new_address_counter; // Pozwala na tworzenie nowych adresów to tablicy symboli (np. t1, t2...)
 int new_label_counter; // Pozwala na tworzenie nowych etykiet do kodu trójadresowego (np. L0 ...)
 int new_table_address_counter; // Pozwala na tworzenie nowych adresów, w których beda zapamiętywane \
 										adresy z tablic
-int address_counter; // Pozwala na przypisywanie miejsca w pamięci nowo utworzonym zmiennym
+unsigned long int address_counter; // Pozwala na przypisywanie miejsca w pamięci nowo utworzonym zmiennym
 
 int number_of_programs; // Pozwala na rozpoznanie, ile jest zagnieżdżonych programow
 
@@ -57,8 +59,8 @@ int contains_errors; // Ustawione na 1, jesli program zawiera błędy i 0, jesli
 typedef struct symbol {
 	char *string;
 	char *type;
-	int address;
-	int size;
+	unsigned long int address;
+	unsigned long int size;
 
 	int first_line;
 	int first_column;
@@ -78,7 +80,20 @@ typedef struct symbols_list_element {
 /******** Korzeń listy symboli *******/
 static symbols_list *symbols_list_root;
 
+/* Struktura zainicjowanych symboli */
+typedef struct initialized_symbol {
+	char *string;
+	bool initialized;
+	struct initialized_symbol *next;
+} initialized_symbol;
 
+typedef struct initialized_symbols_list_element {
+	initialized_symbol *data;
+	struct initialized_symbols_list_element *next;
+} initialized_symbols_list;
+
+/******** Korzen listy zainicjowanych symboli****/
+static initialized_symbols_list *initialized_symbols_list_root;
 
 
 /************* CZWÓRKI ***************/
@@ -137,6 +152,13 @@ int search_for_symbol(char *symbol_name);
 int check_if_symbol_already_declared(char *symbol_name);
 symbol *find_symbol(char *symbol_name);
 void print_symbols();
+
+// Lista zainicjowanych symboli
+void initialize(char *symbol_name);
+void add_initialized_symbols_sublist();
+void remove_initialized_symbols_sublist();
+int check_if_symbol_was_initialized(char *symbol_name);
+void print_initialized_symbols();
 
 // Kod trójadresowy
 void add_four(char *operator1, char *arg1, char *operator2, char *arg2, char *result);

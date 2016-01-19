@@ -1,0 +1,5 @@
+DECLARE
+	n m
+IN
+	GET n;
+END

@@ -30,7 +30,6 @@ void lyyerror(YYLTYPE t, error *errors_list_root, int n, char *s, ...);
 
 %union {
 	struct node *node_pointer;
-	char *string;
 };
 
 
@@ -70,7 +69,7 @@ void lyyerror(YYLTYPE t, error *errors_list_root, int n, char *s, ...);
 %% /**********The grammar follows. ****************/ 
 
 program:
-	DECLARE vdeclarations IN commands END { struct node *children[3] = {$2, $4, $5};
+	DECLARE vdeclarations IN commands END { struct node *children[2] = {$2, $4};
 											$$ = add_node(2, "DECLARE", children);
 										    post_order($$); 
 										    //free_node($$); 
@@ -162,12 +161,17 @@ condition:
 ;
 
 value:
-	num			{$$ = $1;}
-| 	identifier	{$$ = $1;}
+	num			{ $$ = $1;
+					/*struct node *children[0];
+				 $$ = add_node(0, $1->string, children); */}
+| 	identifier	{$$ = $1;
+					/*struct node *children[0];
+				 $$ = add_node(0, $1->string, children);*/ }
 ;
 
 identifier:
-	pidentifier					 { $$ = $1;}
+	pidentifier					 { struct node *children[0];
+				 				   $$ = add_node(0, $1->string, children); }
 | 	pidentifier'('pidentifier')' { struct node *children[2] = {$1, $3};
 								   $$ = add_node(2, "TABLE", children); }
 | 	pidentifier'('num')'		 { struct node *children[2] = {$1, $3};
