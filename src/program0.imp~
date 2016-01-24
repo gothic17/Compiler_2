@@ -1,12 +1,12 @@
-[ deklaracja tablicy ]
 DECLARE
-	n m tab(1234567890)
+    a b
 IN
-	m := 2 - n;
-	GET n;
-	m := 1234567889-n;
-	tab(n) := n;
-	tab(m) := n;
-	PUT tab(n);
-	PUT tab(m);
+    a := 5;
+	b := 5;
+        IF b = 5 THEN 
+		PUT 1;
+        ELSE 
+		PUT 0;
+        ENDIF
+        a := a / 2;
 END

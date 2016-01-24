@@ -1,7 +1,6 @@
 DECLARE
-	n m
+	n
 IN
-	IF n < 2 THEN
-		n := 2;
-	ENDIF
+	n := 100 % 33;
+	PUT n;
 END

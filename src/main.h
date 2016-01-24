@@ -12,6 +12,8 @@ unsigned long int address_counter; // Pozwala na przypisywanie miejsca w pamięc
 
 int number_of_programs; // Pozwala na rozpoznanie, ile jest zagnieżdżonych programow
 
+unsigned long int k;
+
 /****** DRZEWO AST ****************/
 
 // Struktura węzła w drzewie AST
@@ -119,13 +121,17 @@ static four *fours_root;
 
 /************* ASSEMBLER **************/
 
-typedef struct assembler_instruction {
-	int row;
-	char order[6];
-	char arg1[3];
-	char arg2[3];
+typedef struct assembler_line {
+	unsigned long int row;
+	char *order;
+	char *arg1;
+	char *arg2;
 
-} assembler_instruction;
+	struct assembler_line *next;
+} assembler_line;
+
+/*** Korzeń listy poleceń assemblera ****/
+static assembler_line *assembler_root;
 
 
 /************ FUNKCJE *****************/
@@ -161,7 +167,13 @@ int check_if_symbol_was_initialized(char *symbol_name);
 void print_initialized_symbols();
 
 // Kod trójadresowy
+char *generate_new_label();
 void add_four(char *operator1, char *arg1, char *operator2, char *arg2, char *result);
 void print_fours();
+void translate(node *p);
+
+// Assembler
+int backpatch();
+void print_assembler();
 
 #endif

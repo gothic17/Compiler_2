@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <stdarg.h>
 #include "main.h"
+#include "assembler.c"
 #include "translate.c"
 #include "compiler.tab.h"
 
@@ -68,10 +69,10 @@ void post_order (node *p) {
 			post_order(p->children[i]);
 			i++;
 		}
-		printf("%s\n", p->string);
+		//printf("%s\n", p->string);
 	}
 	else {
-		printf("%s\n", p->string);
+		//printf("%s\n", p->string);
 	}
 }
 
@@ -365,6 +366,10 @@ void main(int argc, char **argv) {
 	fours_root->operator1 = "ROOT_FOUR";
 	fours_root->next = NULL;
 
+	/***** Korzen listy poleceń assemblera ****/
+	assembler_root = malloc(sizeof(assembler_line));
+	assembler_root = NULL;
+
 
 	/***** Czytanie z pliku i parser******/
 	char temp[4] = {argv[1][strlen(argv[1])-4], argv[1][strlen(argv[1])-3], argv[1][strlen(argv[1])-2], argv[1][strlen(argv[1])-1]};
@@ -411,29 +416,35 @@ void main(int argc, char **argv) {
 		}
 		else {
 
-			printf("-----Tablica symboli-------\n");
+			/*printf("-----Tablica symboli-------\n");
 			print_symbols();
 
 			printf("-----Tablica zainicjowanych symboli----\n");
 			print_initialized_symbols();
-
+*/
 			printf("-----Kod trójadresowy------\n");
 			print_fours();
 
+			printf("--------Assembler----------\n");
+			assembly();
+			backpatch();
+			repair();
+			print_assembler();
+
 			char *write_file_name = calloc(strlen(argv[1]) - 1, sizeof(char));
-				strncat(write_file_name, argv[1], strlen(argv[1])-4);
-				strcat(write_file_name, ".mr");
-				FILE *write_file = fopen(write_file_name, "w");
-			/*
-				if (write_file == NULL) {
-					printf("Nie udalo sie otworzyc pliku %s.", write_file_name);
-				    exit(0);
-				}*/
-			/*
-				int i;
-				for (i = 0; i < k; i++) {
-					fprintf(write_file, "%s %s %s\n", assembler[i]->order, assembler[i]->arg1, assembler[i]->arg2);
-				}*/
+			strncat(write_file_name, argv[1], strlen(argv[1])-4);
+			strcat(write_file_name, ".mr");
+			FILE *write_file = fopen(write_file_name, "w");
+
+			if (write_file == NULL) {
+				printf("Nie udalo sie otworzyc pliku %s.", write_file_name);
+			    exit(0);
+			}
+
+			while(assembler_root != NULL) {
+				fprintf(write_file, "%s %s %s\n", assembler_root->order, assembler_root->arg1, assembler_root->arg2);
+				assembler_root = assembler_root->next;
+			}
 		}
 	}
 }

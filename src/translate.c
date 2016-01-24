@@ -695,7 +695,6 @@ void interpret(node *p) {
 			}
 		}
 
-
 		char *symbol_name = generate_new_address();
 		symbol *new_symbol = create_symbol(symbol_name, "-", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
@@ -1617,7 +1616,7 @@ void translate(node *p) {
 		add_symbol(new_symbol);
 		p->string = symbol_name_1;
 
-		add_four("<", p->children[0]->string, "", p->children[2]->string, symbol_name_1);
+		add_four("<=", p->children[0]->string, "", p->children[2]->string, symbol_name_1);
 
 
 		char *symbol_name_2 = generate_new_address();
@@ -1704,6 +1703,34 @@ void translate(node *p) {
 		add_four("GOTO", new_label_1, "", "", symbol_name_3);
 
 		add_four("", "", "", "", new_label_2);
+
+		//****Dodane sprawdzenie, czy arg2 = 0*******
+		char *symbol_name_4 = generate_new_address();
+		new_symbol = create_symbol(symbol_name_4, "-", address_counter, 1,
+				p->first_line, p->first_column, p->last_line, p->last_column);
+		address_counter++;
+		add_symbol(new_symbol);
+		p->string = symbol_name_4;
+
+		add_four("=", p->children[0]->string, "", p->children[2]->string, symbol_name_4);
+
+		char *symbol_name_5 = generate_new_address();
+		new_symbol = create_symbol(symbol_name_5, "-", address_counter, 1,
+				p->first_line, p->first_column, p->last_line, p->last_column);
+		address_counter++;
+		add_symbol(new_symbol);
+		p->string = symbol_name_5;
+		char *new_label_3 = generate_new_label();
+		p->string = symbol_name_5;
+
+		add_four("IFZ", symbol_name_4, "GOTO", new_label_3, symbol_name_5);
+
+		translate(p->children[3]);
+
+		add_four("", "", "", "", new_label_3);
+
+
+
 		// Usunięcie ostatniej podlisty
 		//remove_symbols_sublist();
 	}
