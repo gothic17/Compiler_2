@@ -172,7 +172,11 @@ void add_four(char *operator1, char *arg1, char *operator2, char *arg2, char *re
 void print_fours();
 void translate(node *p);
 
+//Optymalizacja
+void optimize_symbols_table(symbols_list *symbols_list_root, char *file_name);
+
 // Assembler
+char *to_char(unsigned long int k);
 int backpatch();
 void print_assembler();
 

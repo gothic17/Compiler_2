@@ -72,6 +72,38 @@ char *generate_new_label() {
 	return string;
 }
 
+void generate_four_number(unsigned long int number, char *r) {
+	char stack[100] = "";
+	int i = 0;
+	if (number > 0) {
+		while (number > 0) {
+			if (number & 1) { // Jest nieparzysta
+				stack[i] = 'I';
+				number--;
+			}
+			else { // Jest parzysta
+				stack[i] = 'S';
+				number = number / 2;
+			}
+			i++;
+		}
+		i--;
+		add_four("ROW", "RESET", r, "", "");
+		while (i >= 0) {
+			if (stack[i] == 'I') {
+				add_four("ROW", "INC", r, "", "");
+			}
+			else {
+				add_four("ROW", "SHL", r, "", "");
+			}
+			i--;
+		}
+	}
+	else {
+		add_four("ROW", "RESET", r, "", "");
+	}
+}
+
 /*********** INICJALIZACJA **********/
 void initialize(char *symbol_name) {
 	if(check_if_symbol_was_initialized(symbol_name) == 0) {
@@ -247,17 +279,19 @@ int check_table(node *p) {
 void interpret(node *p) {
 
 	if (strcmp(p->string, ":=") == 0) {
+		char *symbol_name;
+		char *symbol_name_2;
 		if(is_numeric(p->children[0]->string) == 0) {
 			//Sprawdzenie, czy lewy argument jest tablicą
 			if(strcmp(p->children[0]->string, "TABLE") == 0) {
 				check_table(p->children[0]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
+				symbol_name = generate_new_table_address();
 				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[0]->string = symbol_name;
+				//p->children[0]->string = symbol_name;
 
 				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
 			}
@@ -290,6 +324,7 @@ void interpret(node *p) {
 								p->children[0]->last_line, p->children[0]->last_column));
 					}
 				}
+				symbol_name = strdup(p->children[0]->string);
 			}
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
@@ -297,14 +332,14 @@ void interpret(node *p) {
 			if(strcmp(p->children[1]->string, "TABLE") == 0) {
 				check_table(p->children[1]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
-				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+				symbol_name_2 = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name_2, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[1]->string = symbol_name;
+				//p->children[1]->string = symbol_name;
 
-				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name_2);
 			}
 			else {
 				if(search_for_symbol(p->children[1]->string) == 0) {
@@ -330,11 +365,17 @@ void interpret(node *p) {
 								p->children[1]->last_line, p->children[1]->last_column));
 					}
 				}
+				symbol_name_2 = strdup(p->children[1]->string);
 			}
 		}
+		else {
+			symbol_name_2 = strdup(p->children[1]->string);
+		}
 
-		initialize(p->children[0]->string);
-		add_four(":=", p->children[0]->string, "", p->children[1]->string, p->children[0]->string);
+		//initialize(p->children[0]->string);
+		//add_four(":=", p->children[0]->string, "", p->children[1]->string, p->children[0]->string);
+		initialize(symbol_name);
+		add_four(":=", symbol_name, "", symbol_name_2, symbol_name);
 	}
 
 	if (strcmp(p->string, "GET") == 0) {
@@ -348,9 +389,10 @@ void interpret(node *p) {
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[0]->string = symbol_name;
+				//p->children[0]->string = symbol_name;
 
 				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
+				add_four("GET", symbol_name, "", "", symbol_name);
 			}
 			else {
 				if(search_for_symbol(p->children[0]->string) == 0) {
@@ -370,15 +412,18 @@ void interpret(node *p) {
 								p->children[0]->last_line, p->children[0]->last_column));
 					}
 				}
+				initialize(p->children[0]->string);
+				add_four("GET", p->children[0]->string, "", "", p->children[0]->string);
 			}
 		}
-
+	//	else {
 		/*if(strcmp(find_symbol(p->children[0]->string)->type, "ID") == 0)*/
-			initialize(p->children[0]->string);
-		add_four("GET", p->children[0]->string, "", "", p->children[0]->string);
+		/*	initialize(p->children[0]->string);
+			add_four("GET", p->children[0]->string, "", "", p->children[0]->string);
+		}*/
 	}
 
-	if (strcmp(p->string, "PUT") == 0) {
+	if (strcmp(p->string, "PUT") == 0) { //[DO POPRAWY]
 		if(is_numeric(p->children[0]->string) == 0) {
 			//Sprawdzenie, czy argument jest tablicą
 			if(strcmp(p->children[0]->string, "TABLE") == 0) {
@@ -389,9 +434,10 @@ void interpret(node *p) {
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[0]->string = symbol_name;
+				//p->children[0]->string = symbol_name;
 
 				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
+				add_four("PUT", symbol_name, "", "", symbol_name);
 			}
 			else {
 				if(search_for_symbol(p->children[0]->string) == 0) {
@@ -417,25 +463,30 @@ void interpret(node *p) {
 								p->children[0]->last_line, p->children[0]->last_column));
 					}
 				}
+				add_four("PUT", p->children[0]->string, "", "", p->children[0]->string);
 			}
 		}
-
-		add_four("PUT", p->children[0]->string, "", "", p->children[0]->string);
+		else {
+			//Po prostu dodaj liczbę
+			add_four("PUT", p->children[0]->string, "", "", p->children[0]->string);
+		}
 	}
 
 	if (strcmp(p->string, "+") == 0) {
+		char *symbol_name;
+		char *symbol_name_2;
 		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
 			//Sprawdzenie, czy lewy argument jest tablicą
 			if(strcmp(p->children[0]->string, "TABLE") == 0) {
 				check_table(p->children[0]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
+				symbol_name = generate_new_table_address();
 				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[0]->string = symbol_name;
+				//p->children[0]->string = symbol_name;
 
 				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
 			}
@@ -463,21 +514,25 @@ void interpret(node *p) {
 								p->children[0]->last_line, p->children[0]->last_column));
 					}
 				}
+				symbol_name = strdup(p->children[0]->string);
 			}
+		}
+		else {
+			symbol_name = strdup(p->children[0]->string);
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
 			// Sprawdzenie, czy prawy argument jest tablicą
 			if(strcmp(p->children[1]->string, "TABLE") == 0) {
 				check_table(p->children[1]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
-				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+				symbol_name_2 = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name_2, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[1]->string = symbol_name;
+				//p->children[1]->string = symbol_name_2;
 
-				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name_2);
 			}
 			else {
 				if(search_for_symbol(p->children[1]->string) == 0) {
@@ -503,34 +558,40 @@ void interpret(node *p) {
 								p->children[1]->last_line, p->children[1]->last_column));
 					}
 				}
+				symbol_name_2 = strdup(p->children[1]->string);
 			}
+		}
+		else {
+			symbol_name_2 = strdup(p->children[1]->string);
 		}
 
 
-		char *symbol_name = generate_new_address();
-		symbol *new_symbol = create_symbol(symbol_name, "-", address_counter, 1,
+		char *symbol_name_3 = generate_new_address();
+		symbol *new_symbol = create_symbol(symbol_name_3, "-", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
-		add_four("+", p->children[0]->string, "", p->children[1]->string, symbol_name);
+		add_four("+", symbol_name, "", symbol_name_2, symbol_name_3);
 
 		// Bez dodania poniższego w tablicy czwórek pojawiałyby się np. takie wiersze ":= a - \ a"
-		p->string = symbol_name;
+		p->string = symbol_name_3;
 	}
 
 	if (strcmp(p->string, "-") == 0) {
+		char *symbol_name;
+		char *symbol_name_2;
 		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
 			//Sprawdzenie, czy lewy argument jest tablicą
 			if(strcmp(p->children[0]->string, "TABLE") == 0) {
 				check_table(p->children[0]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
+				symbol_name = generate_new_table_address();
 				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[0]->string = symbol_name;
+				//p->children[0]->string = symbol_name;
 
 				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
 			}
@@ -558,21 +619,25 @@ void interpret(node *p) {
 								p->children[0]->last_line, p->children[0]->last_column));
 					}
 				}
+				symbol_name = strdup(p->children[0]->string);
 			}
+		}
+		else {
+			symbol_name = strdup(p->children[0]->string);
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
 			// Sprawdzenie, czy prawy argument jest tablicą
 			if(strcmp(p->children[1]->string, "TABLE") == 0) {
 				check_table(p->children[1]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
-				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+				symbol_name_2 = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name_2, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[1]->string = symbol_name;
+				//p->children[1]->string = symbol_name_2;
 
-				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name_2);
 			}
 			else {
 				if(search_for_symbol(p->children[1]->string) == 0) {
@@ -598,33 +663,39 @@ void interpret(node *p) {
 								p->children[1]->last_line, p->children[1]->last_column));
 					}
 				}
+				symbol_name_2 = strdup(p->children[1]->string);
 			}
+		}
+		else {
+			symbol_name_2 = strdup(p->children[1]->string);
 		}
 
 
-		char *symbol_name = generate_new_address();
-		symbol *new_symbol = create_symbol(symbol_name, "-", address_counter, 1,
+		char *symbol_name_3 = generate_new_address();
+		symbol *new_symbol = create_symbol(symbol_name_3, "-", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
-		add_four("-", p->children[0]->string, "", p->children[1]->string, symbol_name);
+		add_four("-", symbol_name, "", symbol_name_2, symbol_name_3);
 
-		p->string = symbol_name;
+		p->string = symbol_name_3;
 	}
 
 	if (strcmp(p->string, "*") == 0) {
+		char *symbol_name;
+		char *symbol_name_2;
 		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
 			//Sprawdzenie, czy lewy argument jest tablicą
 			if(strcmp(p->children[0]->string, "TABLE") == 0) {
 				check_table(p->children[0]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
+				symbol_name = generate_new_table_address();
 				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[0]->string = symbol_name;
+				//p->children[0]->string = symbol_name;
 
 				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
 			}
@@ -652,21 +723,25 @@ void interpret(node *p) {
 								p->children[0]->last_line, p->children[0]->last_column));
 					}
 				}
+				symbol_name = strdup(p->children[0]->string);
 			}
+		}
+		else {
+			symbol_name = strdup(p->children[0]->string);
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
 			// Sprawdzenie, czy prawy argument jest tablicą
 			if(strcmp(p->children[1]->string, "TABLE") == 0) {
 				check_table(p->children[1]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
-				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+				symbol_name_2 = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name_2, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[1]->string = symbol_name;
+				//p->children[1]->string = symbol_name_2;
 
-				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name_2);
 			}
 			else {
 				if(search_for_symbol(p->children[1]->string) == 0) {
@@ -692,32 +767,38 @@ void interpret(node *p) {
 								p->children[1]->last_line, p->children[1]->last_column));
 					}
 				}
+				symbol_name_2 = strdup(p->children[1]->string);
 			}
 		}
+		else {
+			symbol_name_2 = strdup(p->children[1]->string);
+		}
 
-		char *symbol_name = generate_new_address();
-		symbol *new_symbol = create_symbol(symbol_name, "-", address_counter, 1,
+		char *symbol_name_3 = generate_new_address();
+		symbol *new_symbol = create_symbol(symbol_name_3, "-", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
-		add_four("*", p->children[0]->string, "", p->children[1]->string, symbol_name);
+		add_four("*", symbol_name, "", symbol_name_2, symbol_name_3);
 
-		p->string = symbol_name;
+		p->string = symbol_name_3;
 	}
 
 	if (strcmp(p->string, "/") == 0) {
+		char *symbol_name;
+		char *symbol_name_2;
 		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
 			//Sprawdzenie, czy lewy argument jest tablicą
 			if(strcmp(p->children[0]->string, "TABLE") == 0) {
 				check_table(p->children[0]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
+				symbol_name = generate_new_table_address();
 				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[0]->string = symbol_name;
+				//p->children[0]->string = symbol_name;
 
 				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
 			}
@@ -745,21 +826,25 @@ void interpret(node *p) {
 								p->children[0]->last_line, p->children[0]->last_column));
 					}
 				}
+				symbol_name = strdup(p->children[0]->string);
 			}
+		}
+		else {
+			symbol_name = strdup(p->children[0]->string);
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
 			// Sprawdzenie, czy prawy argument jest tablicą
 			if(strcmp(p->children[1]->string, "TABLE") == 0) {
 				check_table(p->children[1]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
-				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+				symbol_name_2 = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name_2, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[1]->string = symbol_name;
+				//p->children[1]->string = symbol_name_2;
 
-				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name_2);
 			}
 			else {
 				if(search_for_symbol(p->children[1]->string) == 0) {
@@ -785,33 +870,39 @@ void interpret(node *p) {
 								p->children[1]->last_line, p->children[1]->last_column));
 					}
 				}
+				symbol_name_2 = strdup(p->children[1]->string);
 			}
+		}
+		else {
+			symbol_name_2 = strdup(p->children[1]->string);
 		}
 
 
-		char *symbol_name = generate_new_address();
-		symbol *new_symbol = create_symbol(symbol_name, "-", address_counter, 1,
+		char *symbol_name_3 = generate_new_address();
+		symbol *new_symbol = create_symbol(symbol_name_3, "-", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
-		add_four("/", p->children[0]->string, "", p->children[1]->string, symbol_name);
+		add_four("/", symbol_name, "", symbol_name_2, symbol_name_3);
 
-		p->string = symbol_name;
+		p->string = symbol_name_3;
 	}
 
 	if (strcmp(p->string, "%") == 0) {
+		char *symbol_name;
+		char *symbol_name_2;
 		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
 			//Sprawdzenie, czy lewy argument jest tablicą
 			if(strcmp(p->children[0]->string, "TABLE") == 0) {
 				check_table(p->children[0]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
+				symbol_name = generate_new_table_address();
 				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[0]->string = symbol_name;
+				//p->children[0]->string = symbol_name;
 
 				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
 			}
@@ -839,21 +930,25 @@ void interpret(node *p) {
 								p->children[0]->last_line, p->children[0]->last_column));
 					}
 				}
+				symbol_name = strdup(p->children[0]->string);
 			}
+		}
+		else {
+			symbol_name = strdup(p->children[0]->string);
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
 			// Sprawdzenie, czy prawy argument jest tablicą
 			if(strcmp(p->children[1]->string, "TABLE") == 0) {
 				check_table(p->children[1]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
-				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+				symbol_name_2 = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name_2, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[1]->string = symbol_name;
+				//p->children[1]->string = symbol_name_2;
 
-				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name_2);
 			}
 			else {
 				if(search_for_symbol(p->children[1]->string) == 0) {
@@ -879,33 +974,39 @@ void interpret(node *p) {
 								p->children[1]->last_line, p->children[1]->last_column));
 					}
 				}
+				symbol_name_2 = strdup(p->children[1]->string);
 			}
+		}
+		else {
+			symbol_name_2 = strdup(p->children[1]->string);
 		}
 
 
-		char *symbol_name = generate_new_address();
-		symbol *new_symbol = create_symbol(symbol_name, "-", address_counter, 1,
+		char *symbol_name_3 = generate_new_address();
+		symbol *new_symbol = create_symbol(symbol_name_3, "-", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
-		add_four("%", p->children[0]->string, "", p->children[1]->string, symbol_name);
+		add_four("%", p->children[0]->string, "", p->children[1]->string, symbol_name_3);
 
-		p->string = symbol_name;
+		p->string = symbol_name_3;
 	}
 
 	if (strcmp(p->string, "=") == 0) {
+		char *symbol_name;
+		char *symbol_name_2;
 		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
 			//Sprawdzenie, czy lewy argument jest tablicą
 			if(strcmp(p->children[0]->string, "TABLE") == 0) {
 				check_table(p->children[0]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
+				symbol_name = generate_new_table_address();
 				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[0]->string = symbol_name;
+				//p->children[0]->string = symbol_name;
 
 				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
 			}
@@ -933,21 +1034,25 @@ void interpret(node *p) {
 								p->children[0]->last_line, p->children[0]->last_column));
 					}
 				}
+				symbol_name = strdup(p->children[0]->string);
 			}
+		}
+		else {
+			symbol_name = strdup(p->children[0]->string);
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
 			// Sprawdzenie, czy prawy argument jest tablicą
 			if(strcmp(p->children[1]->string, "TABLE") == 0) {
 				check_table(p->children[1]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
-				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+				symbol_name_2 = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name_2, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[1]->string = symbol_name;
+				//p->children[1]->string = symbol_name_2;
 
-				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name_2);
 			}
 			else {
 				if(search_for_symbol(p->children[1]->string) == 0) {
@@ -973,33 +1078,39 @@ void interpret(node *p) {
 								p->children[1]->last_line, p->children[1]->last_column));
 					}
 				}
+				symbol_name_2 = strdup(p->children[1]->string);
 			}
+		}
+		else {
+			symbol_name_2 = strdup(p->children[1]->string);
 		}
 
 
-		char *symbol_name = generate_new_address();
-		symbol *new_symbol = create_symbol(symbol_name, "-", address_counter, 1,
+		char *symbol_name_3 = generate_new_address();
+		symbol *new_symbol = create_symbol(symbol_name_3, "-", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
-		add_four("=", p->children[0]->string, "", p->children[1]->string, symbol_name);
+		add_four("=", symbol_name, "", symbol_name_2, symbol_name_3);
 
-		p->string = symbol_name;
+		p->string = symbol_name_3;
 	}
 
 	if (strcmp(p->string, "!=") == 0) {
+		char *symbol_name;
+		char *symbol_name_2;
 		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
 			//Sprawdzenie, czy lewy argument jest tablicą
 			if(strcmp(p->children[0]->string, "TABLE") == 0) {
 				check_table(p->children[0]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
+				symbol_name = generate_new_table_address();
 				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[0]->string = symbol_name;
+				//p->children[0]->string = symbol_name;
 
 				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
 			}
@@ -1027,21 +1138,25 @@ void interpret(node *p) {
 								p->children[0]->last_line, p->children[0]->last_column));
 					}
 				}
+				symbol_name = strdup(p->children[0]->string);
 			}
+		}
+		else {
+			symbol_name = strdup(p->children[0]->string);
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
 			// Sprawdzenie, czy prawy argument jest tablicą
 			if(strcmp(p->children[1]->string, "TABLE") == 0) {
 				check_table(p->children[1]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
-				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+				symbol_name_2 = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name_2, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[1]->string = symbol_name;
+				//p->children[1]->string = symbol_name_2;
 
-				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name_2);
 			}
 			else {
 				if(search_for_symbol(p->children[1]->string) == 0) {
@@ -1067,33 +1182,39 @@ void interpret(node *p) {
 								p->children[1]->last_line, p->children[1]->last_column));
 					}
 				}
+				symbol_name_2 = strdup(p->children[1]->string);
 			}
+		}
+		else {
+			symbol_name_2 = strdup(p->children[1]->string);
 		}
 
 
-		char *symbol_name = generate_new_address();
-		symbol *new_symbol = create_symbol(symbol_name, "-", address_counter, 1,
+		char *symbol_name_3 = generate_new_address();
+		symbol *new_symbol = create_symbol(symbol_name_3, "-", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
-		add_four("!=", p->children[0]->string, "", p->children[1]->string, symbol_name);
+		add_four("!=", symbol_name, "", symbol_name_2, symbol_name_3);
 
-		p->string = symbol_name;
+		p->string = symbol_name_3;
 	}
 
 	if (strcmp(p->string, "<") == 0) {
+		char *symbol_name;
+		char *symbol_name_2;
 		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
 			//Sprawdzenie, czy lewy argument jest tablicą
 			if(strcmp(p->children[0]->string, "TABLE") == 0) {
 				check_table(p->children[0]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
+				symbol_name = generate_new_table_address();
 				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[0]->string = symbol_name;
+				//p->children[0]->string = symbol_name;
 
 				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
 			}
@@ -1121,21 +1242,25 @@ void interpret(node *p) {
 								p->children[0]->last_line, p->children[0]->last_column));
 					}
 				}
+				symbol_name = strdup(p->children[0]->string);
 			}
+		}
+		else {
+			symbol_name = strdup(p->children[0]->string);
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
 			// Sprawdzenie, czy prawy argument jest tablicą
 			if(strcmp(p->children[1]->string, "TABLE") == 0) {
 				check_table(p->children[1]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
-				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+				symbol_name_2 = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name_2, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[1]->string = symbol_name;
+				//p->children[1]->string = symbol_name_2;
 
-				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name_2);
 			}
 			else {
 				if(search_for_symbol(p->children[1]->string) == 0) {
@@ -1161,33 +1286,40 @@ void interpret(node *p) {
 								p->children[1]->last_line, p->children[1]->last_column));
 					}
 				}
+				symbol_name_2 = strdup(p->children[1]->string);
 			}
+		}
+		else {
+			symbol_name_2 = strdup(p->children[1]->string);
 		}
 
 
-		char *symbol_name = generate_new_address();
-		symbol *new_symbol = create_symbol(symbol_name, "-", address_counter, 1,
+		char *symbol_name_3 = generate_new_address();
+		symbol *new_symbol = create_symbol(symbol_name_3, "-", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
-		add_four("<", p->children[0]->string, "", p->children[1]->string, symbol_name);
+		add_four("<", symbol_name, "", symbol_name_2, symbol_name_3);
 
-		p->string = symbol_name;
+		p->string = symbol_name_3;
 	}
+
 
 	if (strcmp(p->string, ">") == 0) {
+		char *symbol_name;
+		char *symbol_name_2;
 		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
 			//Sprawdzenie, czy lewy argument jest tablicą
 			if(strcmp(p->children[0]->string, "TABLE") == 0) {
 				check_table(p->children[0]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
+				symbol_name = generate_new_table_address();
 				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[0]->string = symbol_name;
+				//p->children[0]->string = symbol_name;
 
 				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
 			}
@@ -1215,21 +1347,25 @@ void interpret(node *p) {
 								p->children[0]->last_line, p->children[0]->last_column));
 					}
 				}
+				symbol_name = strdup(p->children[0]->string);
 			}
+		}
+		else {
+			symbol_name = strdup(p->children[0]->string);
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
 			// Sprawdzenie, czy prawy argument jest tablicą
 			if(strcmp(p->children[1]->string, "TABLE") == 0) {
 				check_table(p->children[1]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
-				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+				symbol_name_2 = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name_2, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[1]->string = symbol_name;
+				//p->children[1]->string = symbol_name_2;
 
-				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name_2);
 			}
 			else {
 				if(search_for_symbol(p->children[1]->string) == 0) {
@@ -1255,33 +1391,40 @@ void interpret(node *p) {
 								p->children[1]->last_line, p->children[1]->last_column));
 					}
 				}
+				symbol_name_2 = strdup(p->children[1]->string);
 			}
+		}
+		else {
+			symbol_name_2 = strdup(p->children[1]->string);
 		}
 
 
-		char *symbol_name = generate_new_address();
-		symbol *new_symbol = create_symbol(symbol_name, "-", address_counter, 1,
+		char *symbol_name_3 = generate_new_address();
+		symbol *new_symbol = create_symbol(symbol_name_3, "-", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
-		add_four(">", p->children[0]->string, "", p->children[1]->string, symbol_name);
+		add_four(">", symbol_name, "", symbol_name_2, symbol_name_3);
 
-		p->string = symbol_name;
+		p->string = symbol_name_3;
 	}
+
 
 	if (strcmp(p->string, "<=") == 0) {
+		char *symbol_name;
+		char *symbol_name_2;
 		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
 			//Sprawdzenie, czy lewy argument jest tablicą
 			if(strcmp(p->children[0]->string, "TABLE") == 0) {
 				check_table(p->children[0]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
+				symbol_name = generate_new_table_address();
 				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[0]->string = symbol_name;
+				//p->children[0]->string = symbol_name;
 
 				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
 			}
@@ -1309,21 +1452,25 @@ void interpret(node *p) {
 								p->children[0]->last_line, p->children[0]->last_column));
 					}
 				}
+				symbol_name = strdup(p->children[0]->string);
 			}
+		}
+		else {
+			symbol_name = strdup(p->children[0]->string);
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
 			// Sprawdzenie, czy prawy argument jest tablicą
 			if(strcmp(p->children[1]->string, "TABLE") == 0) {
 				check_table(p->children[1]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
-				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+				symbol_name_2 = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name_2, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[1]->string = symbol_name;
+				//p->children[1]->string = symbol_name_2;
 
-				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name_2);
 			}
 			else {
 				if(search_for_symbol(p->children[1]->string) == 0) {
@@ -1349,33 +1496,40 @@ void interpret(node *p) {
 								p->children[1]->last_line, p->children[1]->last_column));
 					}
 				}
+				symbol_name_2 = strdup(p->children[1]->string);
 			}
+		}
+		else {
+			symbol_name_2 = strdup(p->children[1]->string);
 		}
 
 
-		char *symbol_name = generate_new_address();
-		symbol *new_symbol = create_symbol(symbol_name, "-", address_counter, 1,
+		char *symbol_name_3 = generate_new_address();
+		symbol *new_symbol = create_symbol(symbol_name_3, "-", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
-		add_four("<=", p->children[0]->string, "", p->children[1]->string, symbol_name);
+		add_four("<=", symbol_name, "", symbol_name_2, symbol_name_3);
 
-		p->string = symbol_name;
+		p->string = symbol_name_3;
 	}
 
+
 	if (strcmp(p->string, ">=") == 0) {
+		char *symbol_name;
+		char *symbol_name_2;
 		// Sprawdzenie, czy symbole, które nie są liczbami zostały wczesniej zadeklarowane
 		if(is_numeric(p->children[0]->string) == 0) {
 			//Sprawdzenie, czy lewy argument jest tablicą
 			if(strcmp(p->children[0]->string, "TABLE") == 0) {
 				check_table(p->children[0]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
+				symbol_name = generate_new_table_address();
 				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[0]->string = symbol_name;
+				//p->children[0]->string = symbol_name;
 
 				add_four("TAB", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name);
 			}
@@ -1403,21 +1557,25 @@ void interpret(node *p) {
 								p->children[0]->last_line, p->children[0]->last_column));
 					}
 				}
+				symbol_name = strdup(p->children[0]->string);
 			}
+		}
+		else {
+			symbol_name = strdup(p->children[0]->string);
 		}
 		if(is_numeric(p->children[1]->string) == 0) {
 			// Sprawdzenie, czy prawy argument jest tablicą
 			if(strcmp(p->children[1]->string, "TABLE") == 0) {
 				check_table(p->children[1]);
 				//Dodanie czwórki przypisania wartości do komórki w tablicy
-				char *symbol_name = generate_new_table_address();
-				symbol *new_symbol = create_symbol(symbol_name, "ADDRESS", address_counter, 1,
+				symbol_name_2 = generate_new_table_address();
+				symbol *new_symbol = create_symbol(symbol_name_2, "ADDRESS", address_counter, 1,
 						p->first_line, p->first_column, p->last_line, p->last_column);
 				address_counter++;
 				add_symbol(new_symbol);
-				p->children[1]->string = symbol_name;
+				//p->children[1]->string = symbol_name_2;
 
-				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name);
+				add_four("TAB", p->children[1]->children[0]->string, "", p->children[1]->children[1]->string, symbol_name_2);
 			}
 			else {
 				if(search_for_symbol(p->children[1]->string) == 0) {
@@ -1443,18 +1601,22 @@ void interpret(node *p) {
 								p->children[1]->last_line, p->children[1]->last_column));
 					}
 				}
+				symbol_name_2 = strdup(p->children[1]->string);
 			}
+		}
+		else {
+			symbol_name_2 = strdup(p->children[1]->string);
 		}
 
 
-		char *symbol_name = generate_new_address();
-		symbol *new_symbol = create_symbol(symbol_name, "-", address_counter, 1,
+		char *symbol_name_3 = generate_new_address();
+		symbol *new_symbol = create_symbol(symbol_name_3, "-", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
-		add_four(">=", p->children[0]->string, "", p->children[1]->string, symbol_name);
+		add_four(">=", symbol_name, "", symbol_name_2, symbol_name_3);
 
-		p->string = symbol_name;
+		p->string = symbol_name_3;
 	}
 
 }
@@ -1560,33 +1722,56 @@ void translate(node *p) {
 
 	else if (strcmp(p->string, "WHILE") == 0) {
 		char *new_label_1 = generate_new_label();
-
-		add_four("", "", "", "", new_label_1);
-
-		translate(p->children[0]);
-
-		// Utwórz nowy symbol (t2) z przykładu "IFZ t1 GOTO L1 t2"
-		char *symbol_name_1 = generate_new_address();
+		char *new_label_2 = generate_new_label();
+		char *new_label_3 = generate_new_label();
+		char *symbol_name_1= generate_new_address();;
 		symbol *new_symbol = create_symbol(symbol_name_1, "-", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
 		address_counter++;
 		add_symbol(new_symbol);
-		// Utwórz etykietę L1 z powyzszego przykładu
-		char *new_label_2 = generate_new_label();
-		p->string = symbol_name_1;
+		add_four("", "", "", "", new_label_1);
 
-		add_four("IFZ", p->children[0]->string, "GOTO", new_label_2, symbol_name_1);
+		if(strcmp(p->children[0]->string, ">=") == 0 && strcmp(p->children[0]->children[1]->string, "0") == 0) {
+			p->string = symbol_name_1;
+			//Sprawdzenie, czy iterator jest wiekszy od zera
+			add_four(">", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name_1);
+			// Jesli fałszywe, to skocz na koniec
+			add_four("IFZ", symbol_name_1, "GOTO", new_label_3, "");
+			//Jesli prawdziwe, to sprawdz, czy iterator jest równy 0
 
-		translate(p->children[1]);
+			translate(p->children[1]);
 
-		char *symbol_name_2 = generate_new_address();
-		new_symbol = create_symbol(symbol_name_1, "-", address_counter, 1,
-				p->first_line, p->first_column, p->last_line, p->last_column);
-		address_counter++;
-		add_symbol(new_symbol);
-		p->string = symbol_name_2;
+			add_four("GOTO", new_label_1, "", "", "");
+			add_four("","","","",new_label_3);
+			char *symbol_name_3= generate_new_address();;
+					symbol *new_symbol = create_symbol(symbol_name_3, "-", address_counter, 1,
+							p->first_line, p->first_column, p->last_line, p->last_column);
+					address_counter++;
+					add_symbol(new_symbol);
+			add_four("=", p->children[0]->children[0]->string, "", p->children[0]->children[1]->string, symbol_name_3);
+			add_four("IFZ", symbol_name_3, "GOTO", new_label_2, "");
 
-		add_four("GOTO", new_label_1, "", "", symbol_name_2);
+			translate(p->children[1]);
+
+		}
+		else {
+			translate(p->children[0]);
+
+			p->string = symbol_name_1;
+
+			add_four("IFZ", p->children[0]->string, "GOTO", new_label_2, symbol_name_1);
+			translate(p->children[1]);
+
+			char *symbol_name_2 = generate_new_address();
+			new_symbol = create_symbol(symbol_name_2, "-", address_counter, 1,
+					p->first_line, p->first_column, p->last_line, p->last_column);
+			address_counter++;
+			add_symbol(new_symbol);
+			p->string = symbol_name_2;
+
+			add_four("GOTO", new_label_1, "", "", "");
+		}
+
 
 		add_four("", "", "", "", new_label_2);
 	}
@@ -1604,9 +1789,8 @@ void translate(node *p) {
 		// Dodanie wiersza przypisania wartości do iteratora dla pętli FOR np. ":= i - 0 i"
 		add_four(":=", p->children[0]->string, "", p->children[1]->string, p->children[0]->string);
 
-		// Utworzenie nowej etykiety
+		// Utworzenie nowej etykiety, ale dodana będzie później
 		char *new_label_1 = generate_new_label();
-		add_four("", "", "", "", new_label_1);
 
 		// Utworzenie warunku dla iteratora pętli FOR np. "< i - 10 t0"
 		char *symbol_name_1 = generate_new_address();
@@ -1616,8 +1800,44 @@ void translate(node *p) {
 		add_symbol(new_symbol);
 		p->string = symbol_name_1;
 
-		add_four("<=", p->children[0]->string, "", p->children[2]->string, symbol_name_1);
+		/*Zamiana "<= i - n t0" na "<= i - 10 t0" (uniemozliwienie zmiany
+		 * zakresu petli w takcie jej wykonywania)
+		 */
 
+		//Sprawdzenie, czy drugi argument jest liczbą
+		if(is_numeric(p->children[2]->string) == 0) {
+			// Sprawdzenie, czy czytamy z tablicy
+			if(strcmp(find_symbol(p->children[2]->string)->type, "ADDRESS") == 0) {
+				generate_four_number(find_symbol(p->children[2]->string)->address, "3");
+				add_four("ROW", "LOAD", "2", "3", "");
+				add_four("ROW", "LOAD", "0", "2", "");
+			}
+			else {
+			// Wygeneruj adres zmiennej i odczytaj z niej wartość
+			generate_four_number(find_symbol(p->children[2]->string)->address, "1");
+			add_four("ROW", "LOAD", "0", "1", "");
+			}
+			//Wygeneruj nowy symbol
+			char *symbol_name_4 = generate_new_address();
+			new_symbol = create_symbol(symbol_name_4, "-", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+			address_counter++;
+			add_symbol(new_symbol);
+			//Wygeneruj adres nowo utworzonego symbolu
+			generate_four_number(find_symbol(symbol_name_4)->address, "1");
+			//Zapisz wygenerowane wartości pod adresem nowego symbolu
+			add_four("ROW", "STORE", "0", "1", "");
+			//Dodaj miejsce skoku PO obliczeniu wartośc końcowej pętli
+			add_four("", "", "", "", new_label_1);
+			//Porównaj iterator z nowo utworzonym symbolem
+			add_four("<=", p->children[0]->string, "", symbol_name_4, symbol_name_1);
+		}
+		else {
+			//Dodaj miejsce skoku PO obliczeniu wartośc końcowej pętli
+			add_four("", "", "", "", new_label_1);
+			// Zostaw po prostu liczbę
+			add_four("<=", p->children[0]->string, "", p->children[2]->string, symbol_name_1);
+		}
 
 		char *symbol_name_2 = generate_new_address();
 		new_symbol = create_symbol(symbol_name_2, "-", address_counter, 1,
@@ -1664,7 +1884,7 @@ void translate(node *p) {
 
 		// Utworzenie nowej etykiety
 		char *new_label_1 = generate_new_label();
-		add_four("", "", "", "", new_label_1);
+		//add_four("", "", "", "", new_label_1);
 
 		// Utworzenie warunku dla iteratora pętli FOR np. "< i - 10 t0"
 		char *symbol_name_1 = generate_new_address();
@@ -1674,7 +1894,61 @@ void translate(node *p) {
 		add_symbol(new_symbol);
 		p->string = symbol_name_1;
 
-		add_four(">", p->children[0]->string, "", p->children[2]->string, symbol_name_1);
+		/*Zamiana "<= i - n t0" na "<= i - 10 t0" (uniemozliwienie zmiany
+		 * zakresu petli w takcie jej wykonywania)
+		 */
+		char *symbol_name_6;
+		//Sprawdzenie, czy drugi argument jest liczbą
+		if(is_numeric(p->children[2]->string) == 0) {
+			// Sprawdzenie, czy czytamy z tablicy
+			if(strcmp(find_symbol(p->children[2]->string)->type, "ADDRESS") == 0) {
+				generate_four_number(find_symbol(p->children[2]->string)->address, "3");
+				add_four("ROW", "LOAD", "2", "3", "");
+				add_four("ROW", "LOAD", "0", "2", "");
+			}
+			else {
+			// Wygeneruj adres zmiennej i odczytaj z niej wartość
+			generate_four_number(find_symbol(p->children[2]->string)->address, "1");
+			add_four("ROW", "LOAD", "0", "1", "");
+			}
+			//Wygeneruj nowy symbol
+			symbol_name_6 = generate_new_address();
+			new_symbol = create_symbol(symbol_name_6, "-", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+			address_counter++;
+			add_symbol(new_symbol);
+			//Wygeneruj adres nowo utworzonego symbolu
+			generate_four_number(find_symbol(symbol_name_6)->address, "1");
+			//Zapisz wygenerowane wartości pod adresem nowego symbolu
+			add_four("ROW", "STORE", "0", "1", "");
+			//Dodaj miejsce skoku PO obliczeniu wartośc końcowej pętli
+			add_four("", "", "", "", new_label_1);
+			//Porównaj iterator z nowo utworzonym symbolem
+			add_four(">", p->children[0]->string, "", symbol_name_6, symbol_name_1);
+		}
+		else {
+			//Wygeneruj nowy symbol
+			symbol_name_6 = generate_new_address();
+			new_symbol = create_symbol(symbol_name_6, "-", address_counter, 1,
+						p->first_line, p->first_column, p->last_line, p->last_column);
+			address_counter++;
+			add_symbol(new_symbol);
+
+			//Zamiana string na unsigned long int
+			char *ptr;
+			unsigned long int number;
+			number = strtoul(p->children[2]->string, &ptr, 10);
+
+			generate_four_number(number, "0");
+			generate_four_number(find_symbol(symbol_name_6)->address, "1");
+			add_four("ROW", "STORE", "0", "1", "");
+			//Dodaj miejsce skoku PO obliczeniu wartośc końcowej pętli
+			add_four("", "", "", "", new_label_1);
+			// Zostaw po prostu liczbę
+			add_four(">", p->children[0]->string, "", symbol_name_6, symbol_name_1);
+		}
+
+		//add_four(">", p->children[0]->string, "", p->children[2]->string, symbol_name_1);
 
 
 		char *symbol_name_2 = generate_new_address();
@@ -1688,7 +1962,7 @@ void translate(node *p) {
 
 		add_four("IFZ", p->children[0]->string, "GOTO", new_label_2, symbol_name_2);
 
-		// Zapamietaj iterator. Jesli poniżej zostalo zmienione, wyrzuć błąd [DO ZROBIENIA]
+		// Zapamietaj iterator. Jesli poniżej zostalo zmienione, wyrzuć błąd
 		translate(p->children[3]);
 
 		add_four("--", p->children[0]->string, "", "", p->children[0]->string);
@@ -1704,7 +1978,8 @@ void translate(node *p) {
 
 		add_four("", "", "", "", new_label_2);
 
-		//****Dodane sprawdzenie, czy arg2 = 0*******
+		/**Dodane sprawdzenie, czy arg2 = 0 !!! teraz poczatkowa wartośc arg2 jest w nowo wygenerowa
+			nym symbolu, którego wartosci nie da sie zmienić */
 		char *symbol_name_4 = generate_new_address();
 		new_symbol = create_symbol(symbol_name_4, "-", address_counter, 1,
 				p->first_line, p->first_column, p->last_line, p->last_column);
@@ -1712,7 +1987,10 @@ void translate(node *p) {
 		add_symbol(new_symbol);
 		p->string = symbol_name_4;
 
-		add_four("=", p->children[0]->string, "", p->children[2]->string, symbol_name_4);
+		//add_four("=", p->children[0]->string, "", p->children[2]->string, symbol_name_4);
+
+		add_four("=", p->children[0]->string, "", symbol_name_6, symbol_name_4);
+
 
 		char *symbol_name_5 = generate_new_address();
 		new_symbol = create_symbol(symbol_name_5, "-", address_counter, 1,
@@ -1725,10 +2003,20 @@ void translate(node *p) {
 
 		add_four("IFZ", symbol_name_4, "GOTO", new_label_3, symbol_name_5);
 
+
+		//Sprawdzenie przekazywanych wartosci do ostatniego kroku
+/*		generate_four_number(find_symbol(p->children[0]->string)->address, "1");
+		add_four("ROW", "LOAD", "0", "1", "");
+		add_four("ROW", "WRITE", "0", "", "");
+		generate_four_number(find_symbol(symbol_name_6)->address, "1");
+		add_four("ROW", "LOAD", "0", "1", "");
+		add_four("ROW", "WRITE", "0", "", "");
+*/
+		//translate(p->children[3]);
+
 		translate(p->children[3]);
 
 		add_four("", "", "", "", new_label_3);
-
 
 
 		// Usunięcie ostatniej podlisty

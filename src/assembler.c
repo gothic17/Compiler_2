@@ -193,6 +193,13 @@ int assembly() {
 			return 0;
 		}
 
+		/* Jesli operator1 = ROW, to oznacza że mamy po prostu dodac to co jest w dalszej części
+		 * wiersza do assemblera
+		 */
+		if(strcmp(fours_root->operator1, "ROW") == 0) {
+			add_row(fours_root->arg1, fours_root->operator2, fours_root->arg2);
+		}
+
 		// Dodanie label
 		if(strcmp(fours_root->operator1, "") == 0) {
 			add_row("", "", fours_root->result);
@@ -214,7 +221,7 @@ int assembly() {
 
 			//Sprawdź, czy wskaźnik jest liczbą.
 			if(is_numeric(fours_root->arg2) == 0) {
-				// Wygeneruj adres miennej
+				// Wygeneruj adres zmiennej
 				generate_number(find_symbol(fours_root->arg2)->address, "1");
 				add_row("LOAD", "0", "1");
 			}
@@ -250,8 +257,8 @@ int assembly() {
 			if(is_numeric(fours_root->arg1) == 0) {
 				// Sprawdzenie, czy czytamy z tablicy
 				if(strcmp(find_symbol(fours_root->arg1)->type, "ADDRESS") == 0) {
-					generate_number(find_symbol(fours_root->arg1)->address, "1");
-					add_row("LOAD", "0", "1");
+					generate_number(find_symbol(fours_root->arg1)->address, "2");
+					add_row("LOAD", "0", "2");
 				}
 				else {
 					generate_number(find_symbol(fours_root->arg1)->address, "0");
@@ -325,14 +332,9 @@ int assembly() {
 		}
 
 		if(strcmp(fours_root->operator1, "+") == 0) {
-			// Sprawdzenie, czy zapisujemy do tablicy
-			if(strcmp(find_symbol(fours_root->result)->type, "ADDRESS") == 0) {
-				generate_number(find_symbol(fours_root->result)->address, "7");
-				add_row("LOAD", "6", "7");
-			}
-			else {
-				generate_number(find_symbol(fours_root->result)->address, "6");
-			}
+			int forward = 0;
+			int arg2_equals_1 = 0;
+
 
 			//Sprawdzenie, czy pierwszy argument jest liczbą
 			if(is_numeric(fours_root->arg1) == 0) {
@@ -356,40 +358,100 @@ int assembly() {
 			}
 
 
-			//Sprawdzenie, czy drugi argument jest liczbą
-			if(is_numeric(fours_root->arg2) == 0) {
-				// Sprawdzenie, czy czytamy z tablicy
-				if(strcmp(find_symbol(fours_root->arg2)->type, "ADDRESS") == 0) {
-					generate_number(find_symbol(fours_root->arg2)->address, "2");
-					add_row("LOAD", "1", "2");
-					add_row("LOAD", "0", "1");
-				}
-				else {
-				// Wygeneruj adres zmiennej i odczytaj z niej wartość
-				generate_number(find_symbol(fours_root->arg2)->address, "1");
-				add_row("LOAD", "0", "1");
-				}
+			//Sprawdzenie, czy pierwszy argument jest taki sam ja kdrugi
+			if(strcmp(fours_root->arg1, fours_root->arg2) == 0) {
+				add_row("COPY", "0", "3");
 			}
 			else {
-				// Wygeneruj po prostu liczbę
-				char *end;
-				unsigned long int number = strtoul(fours_root->arg2, &end, 10);
-				generate_number(number, "0");
+				//Sprawdzenie, czy drugi argument jest liczbą
+				if(is_numeric(fours_root->arg2) == 0) {
+					// Sprawdzenie, czy czytamy z tablicy
+					if(strcmp(find_symbol(fours_root->arg2)->type, "ADDRESS") == 0) {
+						generate_number(find_symbol(fours_root->arg2)->address, "2");
+						add_row("LOAD", "1", "2");
+						add_row("LOAD", "0", "1");
+					}
+					else {
+						// Wygeneruj adres zmiennej i odczytaj z niej wartość
+						generate_number(find_symbol(fours_root->arg2)->address, "1");
+						add_row("LOAD", "0", "1");
+					}
+				}
+				else {
+					// Sprawdzenie, czy drugi argument równa sie 1
+					if(strcmp(fours_root->arg2, "1") == 0) {
+						arg2_equals_1 = 1;
+						add_row("INC", "3", "");
+					}
+					else {
+						// Wygeneruj po prostu liczbę
+						char *end;
+						unsigned long int number = strtoul(fours_root->arg2, &end, 10);
+						generate_number(number, "0");
+					}
+				}
 			}
 
-			add_row("ADD", "0", "3");
-			add_row("STORE", "0", "6");
+			/********Wygenerowanie adresu do zapisania********/
+
+			/*Sprawdzenie, czy nastepna operacja jest operacja przypisania [DO POPRAWY]*/
+			if(strcmp(fours_root->next->operator1, ":=") == 0) {
+				/*Sprawdzenie, czy zmienna, do której bedziemy zapisywac nie została już wygenerowana\
+				przy generowaniu adresów arg1 i arg2*/
+				if(strcmp(fours_root->next->arg1,fours_root->arg1) == 0) {
+					//Skopiuj arg1 do R6 (adresu zapisu)
+					add_row("COPY", "6", "4");
+				}
+				else if(strcmp(fours_root->next->arg1,fours_root->arg2) == 0) {
+					//Skopiuj arg1 do R6 (adresu zapisu)
+					add_row("COPY", "6", "1");
+				}
+				else {
+					// Sprawdzenie, czy zapisujemy do tablicy
+					if(strcmp(find_symbol(fours_root->next->arg1)->type, "ADDRESS") == 0) {
+						generate_number(find_symbol(fours_root->next->arg1)->address, "7");
+						add_row("LOAD", "6", "7");
+					}
+					else {
+						generate_number(find_symbol(fours_root->next->arg1)->address, "6");
+					}
+				}
+
+				forward = 1;
+			}
+			else {
+
+				// Sprawdzenie, czy zapisujemy do tablicy
+				if(strcmp(find_symbol(fours_root->result)->type, "ADDRESS") == 0) {
+					generate_number(find_symbol(fours_root->result)->address, "7");
+					add_row("LOAD", "6", "7");
+				}
+				else {
+					generate_number(find_symbol(fours_root->result)->address, "6");
+				}
+			}
+
+			//Koncowe obliczenia
+
+			if(arg2_equals_1 == 0) {
+				add_row("ADD", "0", "3");
+				add_row("STORE", "0", "6");
+			}
+			else {
+				add_row("STORE", "3", "6");
+			}
+
+
+
+
+			if(forward == 1) {
+				fours_root = fours_root->next;
+			}
+
 		}
 
 		if(strcmp(fours_root->operator1, "-") == 0) {
-			// Sprawdzenie, czy zapisujemy do tablicy
-			if(strcmp(find_symbol(fours_root->result)->type, "ADDRESS") == 0) {
-				generate_number(find_symbol(fours_root->result)->address, "7");
-				add_row("LOAD", "6", "7");
-			}
-			else {
-				generate_number(find_symbol(fours_root->result)->address, "6");
-			}
+			int forward = 0;
 
 			//Sprawdzenie, czy pierwszy argument jest liczbą
 			if(is_numeric(fours_root->arg1) == 0) {
@@ -422,9 +484,9 @@ int assembly() {
 					add_row("LOAD", "3", "4");
 				}
 				else {
-				// Wygeneruj adres zmiennej i odczytaj z niej wartość
-				generate_number(find_symbol(fours_root->arg2)->address, "4");
-				add_row("LOAD", "3", "4");
+					// Wygeneruj adres zmiennej i odczytaj z niej wartość
+					generate_number(find_symbol(fours_root->arg2)->address, "4");
+					add_row("LOAD", "3", "4");
 				}
 			}
 			else {
@@ -434,21 +496,59 @@ int assembly() {
 				generate_number(number, "3");
 			}
 
+
+			/*Sprawdzenie, czy nastpena operacja jest operacja przypisania */
+			if(strcmp(fours_root->next->operator1, ":=") == 0) {
+					/*Sprawdzenie, czy zmienna, do której bedziemy zapisywac nie została już wygenerowana\
+					przy generowaniu adresów arg1 i arg2*/
+					if(strcmp(fours_root->next->arg1,fours_root->arg1) == 0) {
+						//Skopiuj arg1 do R6 (adresu zapisu)
+						add_row("COPY", "6", "1");
+					}
+					else if(strcmp(fours_root->next->arg1,fours_root->arg2) == 0) {
+						//Skopiuj arg1 do R6 (adresu zapisu)
+						add_row("COPY", "6", "4");
+					}
+					else {
+						// Sprawdzenie, czy zapisujemy do tablicy
+						if(strcmp(find_symbol(fours_root->next->arg1)->type, "ADDRESS") == 0) {
+							generate_number(find_symbol(fours_root->next->arg1)->address, "7");
+							add_row("LOAD", "6", "7");
+						}
+						else {
+							generate_number(find_symbol(fours_root->next->arg1)->address, "6");
+						}
+					}
+
+					forward = 1;
+			}
+			else {
+
+				// Sprawdzenie, czy zapisujemy do tablicy
+				if(strcmp(find_symbol(fours_root->result)->type, "ADDRESS") == 0) {
+					generate_number(find_symbol(fours_root->result)->address, "7");
+					add_row("LOAD", "6", "7");
+				}
+				else {
+					generate_number(find_symbol(fours_root->result)->address, "6");
+				}
+			}
+
 			add_row("SUB", "0", "3");
+
 			add_row("STORE", "0", "6");
+
+
+			if(forward == 1) {
+				fours_root = fours_root->next;
+			}
+
 		}
 
 
 
 		if(strcmp(fours_root->operator1, "*") == 0) {
-			// Sprawdzenie, czy zapisujemy do tablicy
-			if(strcmp(find_symbol(fours_root->result)->type, "ADDRESS") == 0) {
-				generate_number(find_symbol(fours_root->result)->address, "7");
-				add_row("LOAD", "9", "7");
-			}
-			else {
-				generate_number(find_symbol(fours_root->result)->address, "9");
-			}
+			int forward = 0;
 
 			//Sprawdzenie, czy pierwszy argument jest liczbą
 			if(is_numeric(fours_root->arg1) == 0) {
@@ -469,28 +569,72 @@ int assembly() {
 				char *end;
 				unsigned long int number = strtoul(fours_root->arg1, &end, 10);
 				generate_number(number, "1");
+
 			}
 
 
-			//Sprawdzenie, czy drugi argument jest liczbą
-			if(is_numeric(fours_root->arg2) == 0) {
-				// Sprawdzenie, czy czytamy z tablicy
-				if(strcmp(find_symbol(fours_root->arg2)->type, "ADDRESS") == 0) {
-					generate_number(find_symbol(fours_root->arg2)->address, "4");
-					add_row("LOAD", "3", "4");
-					add_row("LOAD", "2", "3");
-				}
-				else {
-				// Wygeneruj adres zmiennej i odczytaj z niej wartość
-				generate_number(find_symbol(fours_root->arg2)->address, "3");
-				add_row("LOAD", "2", "3");
-				}
+			//Sprawdzenie, czy pierwszy argument jest taki sam jak drugi
+			if(strcmp(fours_root->arg1, fours_root->arg2) == 0) {
+				add_row("COPY", "2", "1");
 			}
 			else {
-				// Wygeneruj po prostu liczbę
-				char *end;
-				unsigned long int number = strtoul(fours_root->arg2, &end, 10);
-				generate_number(number, "2");
+				//Sprawdzenie, czy drugi argument jest liczbą
+				if(is_numeric(fours_root->arg2) == 0) {
+					// Sprawdzenie, czy czytamy z tablicy
+					if(strcmp(find_symbol(fours_root->arg2)->type, "ADDRESS") == 0) {
+						generate_number(find_symbol(fours_root->arg2)->address, "4");
+						add_row("LOAD", "3", "4");
+						add_row("LOAD", "2", "3");
+					}
+					else {
+						// Wygeneruj adres zmiennej i odczytaj z niej wartość
+						generate_number(find_symbol(fours_root->arg2)->address, "3");
+						add_row("LOAD", "2", "3");
+					}
+				}
+				else {
+					// Wygeneruj po prostu liczbę
+					char *end;
+					unsigned long int number = strtoul(fours_root->arg2, &end, 10);
+					generate_number(number, "2");
+				}
+			}
+
+			/*Sprawdzenie, czy nastpena operacja jest operacja przypisania */
+			if(strcmp(fours_root->next->operator1, ":=") == 0) {
+				/*Sprawdzenie, czy zmienna, do której bedziemy zapisywac nie została już wygenerowana\
+				przy generowaniu adresów arg1 i arg2*/
+				if(strcmp(fours_root->next->arg1,fours_root->arg1) == 0) {
+					//Skopiuj arg1 do R6 (adresu zapisu)
+					add_row("COPY", "9", "4");
+				}
+				else if(strcmp(fours_root->next->arg1,fours_root->arg2) == 0) {
+					//Skopiuj arg1 do R6 (adresu zapisu)
+					add_row("COPY", "9", "3");
+				}
+				else {
+					// Sprawdzenie, czy zapisujemy do tablicy
+					if(strcmp(find_symbol(fours_root->next->arg1)->type, "ADDRESS") == 0) {
+						generate_number(find_symbol(fours_root->next->arg1)->address, "7");
+						add_row("LOAD", "9", "7");
+					}
+					else {
+						generate_number(find_symbol(fours_root->next->arg1)->address, "9");
+					}
+				}
+
+				forward = 1;
+			}
+			else {
+
+				// Sprawdzenie, czy zapisujemy do tablicy
+				if(strcmp(find_symbol(fours_root->result)->type, "ADDRESS") == 0) {
+					generate_number(find_symbol(fours_root->result)->address, "7");
+					add_row("LOAD", "9", "7");
+				}
+				else {
+					generate_number(find_symbol(fours_root->result)->address, "9");
+				}
 			}
 
 			//Wypisz pobrane liczby
@@ -536,18 +680,16 @@ int assembly() {
 
 			// Zapisz wynik
 			add_row("STORE", "0", "9");
+
+			if(forward == 1) {
+				fours_root = fours_root->next;
+			}
 		}
 
 
 		if(strcmp(fours_root->operator1, "/") == 0) {
-			// Sprawdzenie, czy zapisujemy do tablicy
-			if(strcmp(find_symbol(fours_root->result)->type, "ADDRESS") == 0) {
-				generate_number(find_symbol(fours_root->result)->address, "7");
-				add_row("LOAD", "9", "7");
-			}
-			else {
-				generate_number(find_symbol(fours_root->result)->address, "9");
-			}
+			int forward = 0;
+			int skip_calculations = 0;
 
 			//Sprawdzenie, czy pierwszy argument jest liczbą
 			if(is_numeric(fours_root->arg1) == 0) {
@@ -570,27 +712,78 @@ int assembly() {
 				generate_number(number, "1");
 			}
 
-
-			//Sprawdzenie, czy drugi argument jest liczbą
-			if(is_numeric(fours_root->arg2) == 0) {
-				// Sprawdzenie, czy czytamy z tablicy
-				if(strcmp(find_symbol(fours_root->arg2)->type, "ADDRESS") == 0) {
-					generate_number(find_symbol(fours_root->arg2)->address, "4");
-					add_row("LOAD", "3", "4");
-					add_row("LOAD", "2", "3");
-				}
-				else {
-				// Wygeneruj adres zmiennej i odczytaj z niej wartość
-				generate_number(find_symbol(fours_root->arg2)->address, "3");
-				add_row("LOAD", "2", "3");
-				}
+			//Sprawdzenie, czy pierwszy argument jest taki sam ja kdrugi
+			if(strcmp(fours_root->arg1, fours_root->arg2) == 0) {
+				add_row("COPY", "2", "1");
 			}
 			else {
-				// Wygeneruj po prostu liczbę
-				char *end;
-				unsigned long int number = strtoul(fours_root->arg2, &end, 10);
-				generate_number(number, "2");
+				//Sprawdzenie, czy drugi argument jest liczbą
+				if(is_numeric(fours_root->arg2) == 0) {
+					// Sprawdzenie, czy czytamy z tablicy
+					if(strcmp(find_symbol(fours_root->arg2)->type, "ADDRESS") == 0) {
+						generate_number(find_symbol(fours_root->arg2)->address, "4");
+						add_row("LOAD", "3", "4");
+						add_row("LOAD", "2", "3");
+					}
+					else {
+						// Wygeneruj adres zmiennej i odczytaj z niej wartość
+						generate_number(find_symbol(fours_root->arg2)->address, "3");
+						add_row("LOAD", "2", "3");
+					}
+				}
+				else {
+					// Wygeneruj po prostu liczbę
+					char *end;
+					unsigned long int number = strtoul(fours_root->arg2, &end, 10);
+					if(number != 0) {
+						generate_number(number, "2");
+					}
+					else {
+						add_row("RESET", "0", "");
+						skip_calculations = 1;
+					}
+				}
 			}
+
+			/*Sprawdzenie, czy nastpena operacja jest operacja przypisania */
+			if(strcmp(fours_root->next->operator1, ":=") == 0) {
+				/*Sprawdzenie, czy zmienna, do której bedziemy zapisywac nie została już wygenerowana\
+				przy generowaniu adresów arg1 i arg2*/
+				if(strcmp(fours_root->next->arg1,fours_root->arg1) == 0) {
+					//Skopiuj arg1 do R6 (adresu zapisu)
+					add_row("COPY", "9", "4");
+				}
+				else if(strcmp(fours_root->next->arg1,fours_root->arg2) == 0) {
+					//Skopiuj arg1 do R6 (adresu zapisu)
+					add_row("COPY", "9", "3");
+				}
+				else {
+					// Sprawdzenie, czy zapisujemy do tablicy
+					if(strcmp(find_symbol(fours_root->next->arg1)->type, "ADDRESS") == 0) {
+						generate_number(find_symbol(fours_root->next->arg1)->address, "7");
+						add_row("LOAD", "9", "7");
+					}
+					else {
+						generate_number(find_symbol(fours_root->next->arg1)->address, "9");
+					}
+				}
+
+				forward = 1;
+			}
+			else {
+
+				// Sprawdzenie, czy zapisujemy do tablicy
+				if(strcmp(find_symbol(fours_root->result)->type, "ADDRESS") == 0) {
+					generate_number(find_symbol(fours_root->result)->address, "7");
+					add_row("LOAD", "9", "7");
+				}
+				else {
+					generate_number(find_symbol(fours_root->result)->address, "9");
+				}
+			}
+
+			if(skip_calculations == 0) {
+
 			char *LZ = generate_new_label();
 			char *LX = generate_new_label();
 			char *LY = generate_new_label();
@@ -648,22 +841,20 @@ int assembly() {
 
 			add_row("","",LZ);
 
-
+		}
 
 			// Zapisz wynik
 			add_row("STORE", "0", "9");
+
+			if(forward == 1) {
+				fours_root = fours_root->next;
+			}
 		}
 
 
 		if(strcmp(fours_root->operator1, "%") == 0) {
-			// Sprawdzenie, czy zapisujemy do tablicy
-			if(strcmp(find_symbol(fours_root->result)->type, "ADDRESS") == 0) {
-				generate_number(find_symbol(fours_root->result)->address, "7");
-				add_row("LOAD", "9", "7");
-			}
-			else {
-				generate_number(find_symbol(fours_root->result)->address, "9");
-			}
+			int forward = 0;
+			int skip_calculations = 0;
 
 			//Sprawdzenie, czy pierwszy argument jest liczbą
 			if(is_numeric(fours_root->arg1) == 0) {
@@ -687,26 +878,79 @@ int assembly() {
 			}
 
 
-			//Sprawdzenie, czy drugi argument jest liczbą
-			if(is_numeric(fours_root->arg2) == 0) {
-				// Sprawdzenie, czy czytamy z tablicy
-				if(strcmp(find_symbol(fours_root->arg2)->type, "ADDRESS") == 0) {
-					generate_number(find_symbol(fours_root->arg2)->address, "4");
-					add_row("LOAD", "3", "4");
-					add_row("LOAD", "2", "3");
-				}
-				else {
-				// Wygeneruj adres zmiennej i odczytaj z niej wartość
-				generate_number(find_symbol(fours_root->arg2)->address, "3");
-				add_row("LOAD", "2", "3");
-				}
+
+			//Sprawdzenie, czy pierwszy argument jest taki sam ja kdrugi
+			if(strcmp(fours_root->arg1, fours_root->arg2) == 0) {
+				add_row("COPY", "2", "1");
 			}
 			else {
-				// Wygeneruj po prostu liczbę
-				char *end;
-				unsigned long int number = strtoul(fours_root->arg2, &end, 10);
-				generate_number(number, "2");
+				//Sprawdzenie, czy drugi argument jest liczbą
+				if(is_numeric(fours_root->arg2) == 0) {
+					// Sprawdzenie, czy czytamy z tablicy
+					if(strcmp(find_symbol(fours_root->arg2)->type, "ADDRESS") == 0) {
+						generate_number(find_symbol(fours_root->arg2)->address, "4");
+						add_row("LOAD", "3", "4");
+						add_row("LOAD", "2", "3");
+					}
+					else {
+						// Wygeneruj adres zmiennej i odczytaj z niej wartość
+						generate_number(find_symbol(fours_root->arg2)->address, "3");
+						add_row("LOAD", "2", "3");
+					}
+				}
+				else {
+					// Wygeneruj po prostu liczbę
+					char *end;
+					unsigned long int number = strtoul(fours_root->arg2, &end, 10);
+					if(number != 0) {
+						generate_number(number, "2");
+					}
+					else {
+						add_row("RESET", "0", "");
+						skip_calculations = 1;
+					}
+				}
 			}
+
+
+			/*Sprawdzenie, czy nastpena operacja jest operacja przypisania */
+			if(strcmp(fours_root->next->operator1, ":=") == 0) {
+				/*Sprawdzenie, czy zmienna, do której bedziemy zapisywac nie została już wygenerowana\
+				przy generowaniu adresów arg1 i arg2*/
+				if(strcmp(fours_root->next->arg1,fours_root->arg1) == 0) {
+					//Skopiuj arg1 do R6 (adresu zapisu)
+					add_row("COPY", "9", "4");
+				}
+				else if(strcmp(fours_root->next->arg1,fours_root->arg2) == 0) {
+					//Skopiuj arg1 do R6 (adresu zapisu)
+					add_row("COPY", "9", "3");
+				}
+				else {
+					// Sprawdzenie, czy zapisujemy do tablicy
+					if(strcmp(find_symbol(fours_root->next->arg1)->type, "ADDRESS") == 0) {
+						generate_number(find_symbol(fours_root->next->arg1)->address, "7");
+						add_row("LOAD", "9", "7");
+					}
+					else {
+						generate_number(find_symbol(fours_root->next->arg1)->address, "9");
+					}
+				}
+
+				forward = 1;
+			}
+			else {
+
+				// Sprawdzenie, czy zapisujemy do tablicy
+				if(strcmp(find_symbol(fours_root->result)->type, "ADDRESS") == 0) {
+					generate_number(find_symbol(fours_root->result)->address, "7");
+					add_row("LOAD", "9", "7");
+				}
+				else {
+					generate_number(find_symbol(fours_root->result)->address, "9");
+				}
+			}
+
+			if(skip_calculations == 0) {
 
 			char *LZ = generate_new_label();
 			char *LX = generate_new_label();
@@ -765,8 +1009,14 @@ int assembly() {
 
 			add_row("","",LZ);
 			add_row("COPY", "0", "3");
+
+			}
 			// Zapisz wynik
 			add_row("STORE", "0", "9");
+
+			if(forward == 1) {
+				fours_root = fours_root->next;
+			}
 		}
 
 
@@ -1123,3 +1373,4 @@ int assembly() {
 
 		return 0;
 }
+

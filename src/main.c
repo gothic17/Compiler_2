@@ -6,6 +6,7 @@
 #include "main.h"
 #include "assembler.c"
 #include "translate.c"
+#include "optimize.c"
 #include "compiler.tab.h"
 
 /* Zmienne globalne */
@@ -416,20 +417,23 @@ void main(int argc, char **argv) {
 		}
 		else {
 
+			//optimize_symbols_table(symbols_list_root, argv[1]);
 			/*printf("-----Tablica symboli-------\n");
 			print_symbols();
 
 			printf("-----Tablica zainicjowanych symboli----\n");
 			print_initialized_symbols();
-*/
+
 			printf("-----Kod trójadresowy------\n");
 			print_fours();
 
-			printf("--------Assembler----------\n");
+			printf("--------Assembler----------\n");*/
 			assembly();
 			backpatch();
 			repair();
-			print_assembler();
+
+			//print_assembler();
+
 
 			char *write_file_name = calloc(strlen(argv[1]) - 1, sizeof(char));
 			strncat(write_file_name, argv[1], strlen(argv[1])-4);
